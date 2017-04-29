@@ -153,6 +153,14 @@ module E3DB
       ClientInfo.new(JSON.parse(resp.body, symbolize_names: true))
     end
 
+    def client_key(client_id)
+      if client_id == @config.client_id
+        @public_key
+      else
+        Crypto.decode_public_key(client_info(client_id).public_key.curve25519)
+      end
+    end
+
     # Read a single record by ID from E3DB and return it without
     # decrypting the data fields.
     #

@@ -36,14 +36,13 @@ module E3DB
       ak_cache_key = [writer_id, user_id, type]
       @ak_cache[ak_cache_key] = ak
 
-      url = get_url('access_keys', writer_id, user_id, reader_id, type)
-
-      reader_key = Crypto.decode_public_key(client_info(reader_id).public_key.curve25519)
-
+      reader_key = client_key(reader_id)
       nonce = RbNaCl::Random.random_bytes(RbNaCl::Box.nonce_bytes)
       eak   = RbNaCl::Box.new(reader_key, @private_key).encrypt(nonce, ak)
 
       encoded_eak = sprintf('%s.%s', Crypto.base64encode(eak), Crypto.base64encode(nonce))
+
+      url = get_url('access_keys', writer_id, user_id, reader_id, type)
       @conn.put(url, { :eak => encoded_eak })
     end
 
