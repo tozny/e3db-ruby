@@ -153,6 +153,10 @@ module E3DB
       ClientInfo.new(JSON.parse(resp.body, symbolize_names: true))
     end
 
+    # Query the server for a client's public key.
+    #
+    # @param client_id [String] client ID to look up
+    # @return [RbNaCl::PublicKey] decoded Curve25519 public key
     def client_key(client_id)
       if client_id == @config.client_id
         @public_key
