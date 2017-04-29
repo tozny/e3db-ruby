@@ -277,6 +277,37 @@ module E3DB
       end
     end
 
+    # Grant another E3DB client access to records of a particular type.
+    #
+    # @param type [String] type of records to share
+    # @param reader_id [String] client ID of reader to grant access to
+    def share(type, reader_id)
+      if reader_id == @config.client_id
+        return
+      end
+
+      id = @config.client_id
+      ak = get_access_key(id, id, id, type)
+      put_access_key(id, id, reader_id, type, ak)
+
+      url = get_url('policy', id, id, reader_id, type)
+      @conn.put(url, JSON.generate({:allow => [{:read => {}}]}))
+    end
+
+    # Revoke another E3DB client's access to records of a particular type.
+    #
+    # @param type [String] type of records to revoke access to
+    # @param reader_id [String] client ID of reader to revoke access from
+    def revoke(type, reader_id)
+      if reader_id == @config.client_id
+        return
+      end
+
+      id = @config.client_id
+      url = get_url('policy', id, id, reader_id, type)
+      @conn.put(url, JSON.generate({:deny => [{:read => {}}]}))
+    end
+
     private
     def get_url(*paths)
       sprintf('%s/%s', @config.api_base_url, paths.map { |x| URI.escape x }.join('/'))
