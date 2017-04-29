@@ -49,6 +49,19 @@ module E3DB
     # Load configuration from a JSON file created during registration
     # or with {Config.save}.
     #
+    # The configuration file should contain a single JSON object
+    # with the following structure:
+    #
+    #   {
+    #     "client_id": "UUID",
+    #     "api_key_id": "API_KEY",
+    #     "api_secret": "API_SECRET",
+    #     "public_key": "PUBLIC_KEY",
+    #     "private_key": "PRIVATE_KEY",
+    #     "api_base_url": "URL",
+    #     "auth_base_url": "URL"
+    #  }
+    #
     # @param filename [String] pathname of JSON configuration to load
     # @return [Config] the configuration object loaded from the file
     def self.load(filename)

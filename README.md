@@ -33,6 +33,9 @@ $ brew install libsodium            (Mac OS X)
 $ apt-get install libsodium-dev     (Ubuntu)
 ```
 
+For more information including libsodium installation instructions
+for Windows, see the [libsodium web site](https://download.libsodium.org/doc/installation/).
+
 ## Loading configuration and creating a client
 
 ```ruby
