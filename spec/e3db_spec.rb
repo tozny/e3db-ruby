@@ -15,6 +15,11 @@ describe E3DB do
     expect(info.client_id).to eq(client.config.client_id)
   end
 
+  # TODO: We should throw an E3DB-specific exception.
+  it 'throws an error when a client doesn''t exist' do
+    expect { client.client_info('doesnt exist') }.to raise_error(Faraday::ResourceNotFound)
+  end
+
   it 'can write then read a record' do
     rec1 = client.new_record('test_result')
     rec1.data[:timestamp] = DateTime.now.iso8601
@@ -50,6 +55,16 @@ describe E3DB do
     client.query(record: [rec1_id, rec2_id], data: false) do |r|
       expect(r.meta.type).to eq(type)
     end
+
+    client.delete(rec1_id)
+    client.delete(rec2_id)
+
+    count = 0
+    client.query(record: [rec1_id, rec2_id], data: false) do |r|
+      count += 1
+    end
+
+    expect(count).to eq(0)
   end
 
   it 'can query records by writer id' do
