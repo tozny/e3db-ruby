@@ -149,8 +149,7 @@ module E3DB
     # @param client_id [String] client ID to look up
     # @return [ClientInfo] information about this client
     def client_info(client_id)
-      url = sprintf('%s/clients/%s', @config.api_base_url, client_id)
-      resp = @conn.get(url)
+      resp = @conn.get(get_url('clients', client_id))
       ClientInfo.new(JSON.parse(resp.body, symbolize_names: true))
     end
 
@@ -160,8 +159,7 @@ module E3DB
     # @param record_id [String] record ID to look up
     # @return [Record] encrypted record object
     def read_raw(record_id)
-      url = sprintf('%s/records/%s', @config.api_base_url, record_id)
-      resp = @conn.get(url)
+      resp = @conn.get(get_url('records', record_id))
       json = JSON.parse(resp.body, symbolize_names: true)
       Record.new(json)
     end
@@ -194,7 +192,7 @@ module E3DB
     # @param record [Record] record to write
     # @return [String] the unique ID of the written record
     def write(record)
-      url = sprintf('%s/records', @config.api_base_url)
+      url = get_url('records')
       resp = @conn.post(url, encrypt_record(record).to_hash)
       json = JSON.parse(resp.body, symbolize_names: true)
       json[:meta][:record_id]
@@ -204,8 +202,7 @@ module E3DB
     #
     # @param record_id [String] unique ID of record to delete
     def delete(record_id)
-      url = sprintf('%s/records/%s', @config.api_base_url, record_id)
-      resp = @conn.delete(url)
+      resp = @conn.delete(get_url('records', record_id))
     end
 
     class Query < Dry::Struct
@@ -247,7 +244,7 @@ module E3DB
       q = Query.new(after_index: 0, include_data: data, writer_ids: writer,
                     record_ids: record, content_types: type, plain: plain,
                     user_ids: nil, count: DEFAULT_QUERY_COUNT)
-      url = sprintf('%s/search', @config.api_base_url)
+      url = get_url('search')
       loop do
         resp = @conn.post(url, q.as_json)
         json = JSON.parse(resp.body, symbolize_names: true)
@@ -266,6 +263,11 @@ module E3DB
 
         q.after_index = json[:last_index]
       end
+    end
+
+    private
+    def get_url(*paths)
+      sprintf('%s/%s', @config.api_base_url, paths.map { |x| URI.escape x }.join('/'))
     end
   end
 end

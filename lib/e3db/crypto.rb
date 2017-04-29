@@ -15,7 +15,7 @@ module E3DB
         return @ak_cache[ak_cache_key]
       end
 
-      url = sprintf('%s/access_keys/%s/%s/%s/%s', @config.api_base_url, writer_id, user_id, reader_id, type)
+      url = get_url('access_keys', writer_id, user_id, reader_id, type)
       resp = @conn.get(url)
       json = JSON.parse(resp.body, symbolize_names: true)
 
@@ -36,7 +36,7 @@ module E3DB
       ak_cache_key = [writer_id, user_id, type]
       @ak_cache[ak_cache_key] = ak
 
-      url = sprintf('%s/access_keys/%s/%s/%s/%s', @config.api_base_url, writer_id, user_id, reader_id, type)
+      url = get_url('access_keys', writer_id, user_id, reader_id, type)
 
       reader_key = Crypto.decode_public_key(client_info(reader_id).public_key.curve25519)
 
