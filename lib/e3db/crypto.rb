@@ -15,7 +15,7 @@ module E3DB
         return @ak_cache[ak_cache_key]
       end
 
-      url = get_url('access_keys', writer_id, user_id, reader_id, type)
+      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
       resp = @conn.get(url)
       json = JSON.parse(resp.body, symbolize_names: true)
 
@@ -42,7 +42,7 @@ module E3DB
 
       encoded_eak = sprintf('%s.%s', Crypto.base64encode(eak), Crypto.base64encode(nonce))
 
-      url = get_url('access_keys', writer_id, user_id, reader_id, type)
+      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
       @conn.put(url, { :eak => encoded_eak })
     end
 

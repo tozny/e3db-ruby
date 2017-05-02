@@ -7,8 +7,7 @@
 
 
 module E3DB
-  DEFAULT_AUTH_URL = 'https://api.dev.tot.tozny.com/v1'
-  DEFAULT_API_URL = 'https://api.dev.e3db.tozny.com/v1'
+  DEFAULT_API_URL = 'https://dev.e3db.com/'
 
   # Configuration and credentials for E3DB.
   #
@@ -45,7 +44,6 @@ module E3DB
     attribute :public_key, Types::String
     attribute :private_key, Types::String
     attribute :api_url, Types::String.default(DEFAULT_API_URL)
-    attribute :auth_url, Types::String.default(DEFAULT_AUTH_URL)
     attribute :logging, Types::Bool
 
     # Load configuration from a JSON file created during registration
@@ -62,7 +60,6 @@ module E3DB
     #     "public_key": "PUBLIC_KEY",
     #     "private_key": "PRIVATE_KEY",
     #     "api_url": "URL",
-    #     "auth_url": "URL"
     #  }
     #
     # @param filename [String] pathname of JSON configuration to load

@@ -124,8 +124,8 @@ module E3DB
       @oauth_client = OAuth2::Client.new(
           config.api_key_id,
           config.api_secret,
-          :site => config.auth_url,
-          :token_url => '/v1/token',
+          :site => config.api_url,
+          :token_url => '/v1/auth/token',
           :auth_scheme => :basic_auth,
           :raise_errors => false)
 
@@ -149,7 +149,7 @@ module E3DB
     # @param client_id [String] client ID to look up
     # @return [ClientInfo] information about this client
     def client_info(client_id)
-      resp = @conn.get(get_url('clients', client_id))
+      resp = @conn.get(get_url('v1', 'storage', 'clients', client_id))
       ClientInfo.new(JSON.parse(resp.body, symbolize_names: true))
     end
 
@@ -171,7 +171,7 @@ module E3DB
     # @param record_id [String] record ID to look up
     # @return [Record] encrypted record object
     def read_raw(record_id)
-      resp = @conn.get(get_url('records', record_id))
+      resp = @conn.get(get_url('v1', 'storage', 'records', record_id))
       json = JSON.parse(resp.body, symbolize_names: true)
       Record.new(json)
     end
@@ -204,7 +204,7 @@ module E3DB
     # @param record [Record] record to write
     # @return [String] the unique ID of the written record
     def write(record)
-      url = get_url('records')
+      url = get_url('v1', 'storage', 'records')
       resp = @conn.post(url, encrypt_record(record).to_hash)
       json = JSON.parse(resp.body, symbolize_names: true)
       json[:meta][:record_id]
@@ -214,7 +214,7 @@ module E3DB
     #
     # @param record_id [String] unique ID of record to delete
     def delete(record_id)
-      resp = @conn.delete(get_url('records', record_id))
+      resp = @conn.delete(get_url('v1', 'storage', 'records', record_id))
     end
 
     class Query < Dry::Struct
@@ -256,7 +256,7 @@ module E3DB
       q = Query.new(after_index: 0, include_data: data, writer_ids: writer,
                     record_ids: record, content_types: type, plain: plain,
                     user_ids: nil, count: DEFAULT_QUERY_COUNT)
-      url = get_url('search')
+      url = get_url('v1', 'storage', 'search')
       loop do
         resp = @conn.post(url, q.as_json)
         json = JSON.parse(resp.body, symbolize_names: true)
@@ -290,7 +290,7 @@ module E3DB
       ak = get_access_key(id, id, id, type)
       put_access_key(id, id, reader_id, type, ak)
 
-      url = get_url('policy', id, id, reader_id, type)
+      url = get_url('v1', 'storage', 'policy', id, id, reader_id, type)
       @conn.put(url, JSON.generate({:allow => [{:read => {}}]}))
     end
 
@@ -304,13 +304,13 @@ module E3DB
       end
 
       id = @config.client_id
-      url = get_url('policy', id, id, reader_id, type)
+      url = get_url('v1', 'storage', 'policy', id, id, reader_id, type)
       @conn.put(url, JSON.generate({:deny => [{:read => {}}]}))
     end
 
     private
     def get_url(*paths)
-      sprintf('%s/%s', @config.api_url, paths.map { |x| URI.escape x }.join('/'))
+      sprintf('%s/%s', @config.api_url.chomp('/'), paths.map { |x| URI.escape x }.join('/'))
     end
   end
 end
