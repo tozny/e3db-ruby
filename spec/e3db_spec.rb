@@ -5,7 +5,7 @@ require 'securerandom'
 TEST_SHARE_CLIENT = '17d19999-f985-445b-a26a-7737d1b4e031'
 
 describe E3DB do
-  opts = E3DB::Config.load('.integration-test.json')
+  opts = E3DB::Config.load_profile('integration-test')
   opts.logging = false
   client = E3DB::Client.new(opts)
 
