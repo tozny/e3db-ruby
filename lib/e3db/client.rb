@@ -124,7 +124,7 @@ module E3DB
       @oauth_client = OAuth2::Client.new(
           config.api_key_id,
           config.api_secret,
-          :site => DEFAULT_AUTH_URL,
+          :site => config.auth_url,
           :token_url => '/v1/token',
           :auth_scheme => :basic_auth,
           :raise_errors => false)
@@ -310,7 +310,7 @@ module E3DB
 
     private
     def get_url(*paths)
-      sprintf('%s/%s', @config.api_base_url, paths.map { |x| URI.escape x }.join('/'))
+      sprintf('%s/%s', @config.api_url, paths.map { |x| URI.escape x }.join('/'))
     end
   end
 end
