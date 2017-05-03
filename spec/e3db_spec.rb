@@ -2,7 +2,7 @@ require 'spec_helper'
 require 'securerandom'
 
 # jamesjb scratch profile on development instance
-TEST_SHARE_CLIENT = '17d19999-f985-445b-a26a-7737d1b4e031'
+TEST_SHARE_CLIENT = 'dac7899f-c474-4386-9ab8-f638dcc50dec'
 
 describe E3DB do
   opts = E3DB::Config.load_profile('integration-test')
