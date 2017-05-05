@@ -7,7 +7,7 @@
 
 
 module E3DB
-  DEFAULT_API_URL = 'https://dev.e3db.com/'
+  DEFAULT_API_URL = 'https://api.e3db.com/'
 
   # Configuration and credentials for E3DB.
   #
