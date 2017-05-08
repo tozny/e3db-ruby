@@ -1,4 +1,4 @@
-[![Gem Version][gem-image]][gem-url]
+[![Gem Version][gem-image]][gem-url] [![Build Status][travis-image]][travis-url]
 
 # Introduction
 
@@ -148,3 +148,5 @@ The gem is available as open source under the terms of the [MIT License](http://
 
 [gem-image]: https://badge.fury.io/rb/e3db.svg
 [gem-url]: https://rubygems.org/gems/e3db
+[travis-image]: https://travis-ci.org/tozny/e3db-ruby.svg?branch=master
+[travis-url]: https://travis-ci.org/tozny/e3db-ruby
