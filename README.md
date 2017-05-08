@@ -1,3 +1,4 @@
+[![Gem Version][gem-image]][gem-url]
 
 # Introduction
 
@@ -133,6 +134,10 @@ then run `bundle exec rake release`, which will create a git tag for the
 version, push git commits and tags, and push the `.gem` file to
 [rubygems.org](https://rubygems.org).
 
+## Documentation
+
+Comprehensive documentaiton for the SDK can be found online [via RubyDoc.info](http://www.rubydoc.info/gems/e3db/1.0.0).
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/tozny/e3db-ruby.
@@ -140,3 +145,6 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/tozny/
 ## License
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
+
+[gem-image]: https://badge.fury.io/rb/e3db.svg
+[gem-url]: https://rubygems.org/gems/e3db
