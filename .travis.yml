@@ -15,5 +15,5 @@ before_install: gem install bundler -v 1.12.3
 install:
   - ./travis-install-libsodium.sh
   - ./travis-install-configfile.sh
-  - export PATH=$HOME/libsodium:$PATH
+  - export PATH=$HOME/libsodium/lib:$PATH
   - bundle install
