@@ -7,7 +7,10 @@ set -e
 
 # Check if the config is already set
 if [ ! -d "$HOME/.tozny/integration-test" ]; then
-    cat > "$HOME/.tozny/integration-test/e3db.json" <<EOT
+    mkdir -p "$HOME/.tozny/integration-test"
+fi
+
+cat > "$HOME/.tozny/integration-test/e3db.json" <<EOT
 {
     "version":1,
     "api_url":"${API_URL}",
@@ -19,6 +22,3 @@ if [ ! -d "$HOME/.tozny/integration-test" ]; then
     "private_key":"${PRIVATE_KEY}"
 }
 EOT
-else
-  echo 'Using cached config.'
-fi
