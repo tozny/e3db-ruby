@@ -22,6 +22,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency 'simplecov', '~> 0.14.1'
+  spec.add_development_dependency 'coveralls', '~> 0.8.0'
 
   spec.add_dependency 'dry-struct', '~> 0.2.1'
   spec.add_dependency 'lru_redux', '~> 1.1'
