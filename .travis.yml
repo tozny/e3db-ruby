@@ -13,6 +13,7 @@ cache:
 before_install: gem install bundler -v 1.12.3
 
 install:
-  - gem install rbnacl-libsodium
+  - ./travis-install-libsodium.sh
   - ./travis-install-configfile.sh
+  - export PATH=$HOME/libsodium:$PATH
   - bundle install
