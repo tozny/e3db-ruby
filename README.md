@@ -1,4 +1,4 @@
-[![Gem Version][gem-image]][gem-url] [![Build Status][travis-image]][travis-url]
+[![Gem Version][gem-image]][gem-url] [![Build Status][travis-image]][travis-url] [![Coverage Status][coveralls-image]][coveralls-url]
 
 # Introduction
 
@@ -150,3 +150,5 @@ The gem is available as open source under the terms of the [MIT License](http://
 [gem-url]: https://rubygems.org/gems/e3db
 [travis-image]: https://travis-ci.org/tozny/e3db-ruby.svg?branch=master
 [travis-url]: https://travis-ci.org/tozny/e3db-ruby
+[coveralls-image]: https://coveralls.io/repos/github/tozny/e3db-ruby/badge.svg?branch=master
+[coveralls-url]: https://coveralls.io/github/tozny/e3db-ruby
