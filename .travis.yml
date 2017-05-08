@@ -6,6 +6,12 @@ rvm:
   - 2.2.7
   - 2.3.4
   - 2.4.1
+
+cache:
+  bundler: true
+  directories:
+  - $HOME/libsodium
+
 before_install: gem install bundler -v 1.12.3
 
 install:
