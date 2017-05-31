@@ -87,7 +87,7 @@ def new_status
 end
 
 def timeline (client_id = nil)
-  if client_id === nil
+  if client_id == nil
     client_id = $config.client_id
   end
   $client.query(type: 'status', writer:client_id) do |record|
@@ -103,7 +103,7 @@ def profile_menu
 end
 
 def get_profile (client_id = nil)
-  if client_id === nil
+  if client_id == nil
     client_id = $config.client_id
   end
   $client.query(type: 'profile', writer:client_id) do |record|
@@ -128,7 +128,7 @@ end
 
 def get_profile_name (client_id = nil)
   p = get_profile(client_id)
-  if (p === nil)
+  if (p == nil)
     return nil
   else
     return (p.data[:first_name] + " " + p.data[:last_name] + " (" + p.data[:nick_name] + ")")
