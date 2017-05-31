@@ -14,7 +14,7 @@ module E3DB
   # Typically a configuration is loaded from a JSON file generated
   # during registration via the E3DB administration console
   # or command-line tool. To load a configuration from a JSON file,
-  # use {Config.load}.
+  # use {E3DB::Config.load}.
   #
   # @!attribute version
   #   @return [Int] the version number of the configuration format (currently 1)
@@ -47,7 +47,7 @@ module E3DB
     attribute :logging, Types::Bool
 
     # Load configuration from a JSON file created during registration
-    # or with {Config.save}.
+    # or with {E3DB::Config.save}.
     #
     # The configuration file should contain a single JSON object
     # with the following structure:

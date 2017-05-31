@@ -115,6 +115,26 @@ client.query(type: 'contact') do |record|
 end
 ```
 
+In this example, the `E3DB::Client#query` method takes a block that will
+execute for each record that matches the query. Records will be streamed
+efficiently from the server in batches, allowing processing of large data
+sets without consuming excessive memory.
+
+In some cases, it is more convenient to load all results into memory
+for processing. To achieve this, instead of passing a block to
+`E3DB::Client#query`, you can call `Enumerable` methods on the query result,
+including `Enumerable#to_a` to convert the results to an array.
+
+For example:
+
+```ruby
+results = client.query(type: 'contact').to_a
+printf("There were %d results.\n", results.length)
+results.each do |record|
+  puts record
+end
+```
+
 ## Development
 
 Before running tests, register an `integration-test` profile using
