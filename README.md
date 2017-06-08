@@ -84,19 +84,18 @@ client = E3DB::Client.new(config)
 
 ## Writing a record
 
-To write new records to the database, first create a blank record
-of the correct type using `E3DB::Client#new_record`. Then fill in
-the fields of the record's `data` hash. Finally, write the record
-to the database with `E3DB::Client#write`, which returns the
-unique ID of the newly created record.
+To write new records to the database, call the `E3DB::Client#write`
+method with a string describing the type of data to be written,
+along with a hash containing the fields of the record.  `E3DB::Client#write`
+returns the newly created record.
 
 ```ruby
-record = client.new_record('contact')
-record.data[:first_name] = 'Jon'
-record.data[:last_name] = 'Snow'
-record.data[:phone] = '555-555-1212'
-record_id = client.write(record)
-printf("Wrote record %s\n", record_id)
+record = client.write('contact', {
+  :first_name => 'Jon',
+  :last_name => 'Snow',
+  :phone => '555-555-1212'
+})
+printf("Wrote record %s\n", record.meta.record_id)
 ```
 
 ## Querying Records
