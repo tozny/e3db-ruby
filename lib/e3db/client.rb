@@ -358,7 +358,15 @@ module E3DB
           results.each do |r|
             record = Record.new(meta: r[:meta], data: r[:record_data] || Hash.new)
             if q.include_data && !@raw
-              record = @client.instance_eval { decrypt_record(record) }
+              access_key = r[:access_key]
+              if access_key
+                record = @client.instance_eval {
+                  ak = decrypt_eak(access_key)
+                  decrypt_record_with_key(record, ak)
+                }
+              else
+                record = @client.instance_eval { decrypt_record(record) }
+              end
             end
             yield record
           end
