@@ -24,26 +24,28 @@ client = E3DB::Client.new(config)
 # ---------------------------------------------------------
 
 # Create a record by first creating a local version as a map:
-record = client.new_record('test-contact')
-record.data[:name]          = 'Jon Snow'
-record.data[:what_he_knows] = 'Nothing'
+data = {
+    :name => 'Jon Snow',
+    :what_he_knows => 'Nothing'
+}
 
 # Now encrypt the *value* part of the record, write it to the server and
-# the server returns a unique ID:
-record_id = client.write(record)
+# the server returns the newly created record:
+record = client.write('test-contact', data)
+record_id = record.meta.record_id
 puts("Wrote:    " + record_id)
 
 # ---------------------------------------------------------
 # Simple reading and queries
 # ---------------------------------------------------------
 
-# Use the unique ID returned above to read a single record from E3DB:
-newRecord = client.read(record_id)
+# Use the new record's unique ID to read the same record again from E3DB:
+newRecord = client.read(record.meta.record_id)
 puts 'Record:   ' + newRecord.data[:name] + ' ' + record.data[:what_he_knows]
 
 # Query for all records of type 'test-contact' and print out
 # a little bit of data and metadata.
-client.query(type: 'test-contact') do |record|
+client.query(type: 'test-contact').each do |record|
     puts 'Data:     ' + record.data[:name] + ' ' + record.data[:what_he_knows]
     puts 'Metadata: ' + record.meta.record_id + ' ' + record.meta.type
 end
@@ -58,44 +60,35 @@ client.share('test-contact', isaac_client_id)
 
 # Share all of the records of type 'test-contact' with Isaac's email address.
 # This only works if the client has opted into discovery of their client_id.
-# TODO: Look up based on email address
+client.share('test-contact', 'ijones+feedback@tozny.com')
 
 # ---------------------------------------------------------
 # More complex queries
 # ---------------------------------------------------------
 
 # Create some new records of the same type (note that they are also shared
-# automatically since they are a type that we have shared above.
+# automatically since they are a type that we have shared above. We
+# will also add some "plain" fields that are not secret but can be used
+# for efficient querying:
 
-bran = client.new_record('test-contact')
-bran.data[:name]           = 'Bran'
-bran.data[:what_he_knows]  = 'Crow'
+bran_data = { :name => 'Bran', :what_he_knows => 'Crow' }
+bran_plain = { :house => 'Stark', :ageRange => 'child' }
+client.write('test-contact', bran_data, bran_plain)
 
-#Add unencrypted metadata for queries:
-bran.meta.plain[:house]    = 'Stark'
-bran.meta.plain[:ageRange] = 'child'
-record_id = client.write(bran)
+hodor_data = { :name => 'Hodor', :what_he_knows => 'Hodor' }
+hodor_plain = { :house => 'Stark', :ageRange => 'adult' }
+client.write('test-contact', hodor_data, hodor_plain)
 
-record = client.new_record('test-contact')
-record.data[:name]           = 'Hodor'
-record.data[:what_he_knows]  = 'Hodor'
-record.meta.plain[:house]    = 'Stark'
-record.meta.plain[:ageRange] = 'adult'
-client.write(record)
-
-record = client.new_record('test-contact')
-record.data[:name]           = 'Doran'
-record.data[:what_he_knows]  = 'Oberyn'
-record.meta.plain[:house]    = 'Martell'
-record.meta.plain[:ageRange] = 'adult'
-client.write(record)
+doran_data = { :name => 'Doran', :what_he_knows => 'Oberyn' }
+doran_plain = { :house => 'Martell', :ageRange => 'adult' }
+client.write('test-contact', doran_data, doran_plain)
 
 # Create a query that finds everyone from house Stark, but not others:
 queryWesteros = Hash.new
 queryWesteros = {:eq => {:name => 'house', :value => 'Stark'} }
 
 # Execute that query:
-client.query(plain: queryWesteros) do |record|
+client.query(plain: queryWesteros).each do |record|
     puts record.data[:name]
 end
 
@@ -113,11 +106,8 @@ end
 # ---------------------------------------------------------
 # Learning about other clients
 # ---------------------------------------------------------
-isaac_client_info = client.client_info(isaac_client_id)
+isaac_client_info = client.client_info('ijones+feedback@tozny.com')
 puts isaac_client_info.inspect
-
-# TODO: Find Isaac's client_id based on his email address
-# client.find('ijones+feedback@tozny.com')
 
 # Fetch the public key:
 isaac_pub_key = client.client_key(isaac_client_id)
@@ -147,7 +137,7 @@ puts rawRecord.inspect
 # ---------------------------------------------------------
 
 # Revoke the sharing created by the client.share
-client.revoke('test-contact', 'db1744b9-3fb6-4458-a291-0bc677dba08b')
+client.revoke('test-contact', 'ijones+feedback@tozny.com')
 
 # Delete the record we created above
 client.delete(record_id)

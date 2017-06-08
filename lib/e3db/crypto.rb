@@ -9,50 +9,16 @@
 module E3DB
   class Client
     private
-    def get_access_key(writer_id, user_id, reader_id, type)
-      ak_cache_key = [writer_id, user_id, type]
-      if @ak_cache.key? ak_cache_key
-        return @ak_cache[ak_cache_key]
-      end
-
-      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
-      resp = @conn.get(url)
-      json = JSON.parse(resp.body, symbolize_names: true)
-
-      k = json[:authorizer_public_key][:curve25519]
-      authorizer_pubkey = Crypto.decode_public_key(k)
-
-      fields     = json[:eak].split('.', 2)
-      ciphertext = Crypto.base64decode(fields[0])
-      nonce      = Crypto.base64decode(fields[1])
-      box        = RbNaCl::Box.new(authorizer_pubkey, @private_key)
-
-      ak = box.decrypt(nonce, ciphertext)
-      @ak_cache[ak_cache_key] = ak
-      ak
-    end
-
-    def put_access_key(writer_id, user_id, reader_id, type, ak)
-      ak_cache_key = [writer_id, user_id, type]
-      @ak_cache[ak_cache_key] = ak
-
-      reader_key = client_key(reader_id)
-      nonce = RbNaCl::Random.random_bytes(RbNaCl::Box.nonce_bytes)
-      eak   = RbNaCl::Box.new(reader_key, @private_key).encrypt(nonce, ak)
-
-      encoded_eak = sprintf('%s.%s', Crypto.base64encode(eak), Crypto.base64encode(nonce))
-
-      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
-      @conn.put(url, { :eak => encoded_eak })
-    end
-
-    def decrypt_record(encrypted_record)
-      record = Record.new(meta: encrypted_record.meta.clone, data: Hash.new)
-
+    def decrypt_record(record)
       writer_id = record.meta.writer_id
       user_id = record.meta.user_id
       type = record.meta.type
       ak = get_access_key(writer_id, user_id, @config.client_id, type)
+      decrypt_record_with_key(record, ak)
+    end
+
+    def decrypt_record_with_key(encrypted_record, ak)
+      record = Record.new(meta: encrypted_record.meta.clone, data: Hash.new)
 
       encrypted_record.data.each do |k, v|
         fields = v.split('.', 4)
@@ -99,6 +65,48 @@ module E3DB
 
       record
     end
+
+    def decrypt_eak(json)
+      k = json[:authorizer_public_key][:curve25519]
+      authorizer_pubkey = Crypto.decode_public_key(k)
+
+      fields     = json[:eak].split('.', 2)
+      ciphertext = Crypto.base64decode(fields[0])
+      nonce      = Crypto.base64decode(fields[1])
+      box        = RbNaCl::Box.new(authorizer_pubkey, @private_key)
+
+      box.decrypt(nonce, ciphertext)
+    end
+
+    def get_access_key(writer_id, user_id, reader_id, type)
+      ak_cache_key = [writer_id, user_id, type]
+      if @ak_cache.key? ak_cache_key
+        return @ak_cache[ak_cache_key]
+      end
+
+      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
+      resp = @conn.get(url)
+      json = JSON.parse(resp.body, symbolize_names: true)
+
+      ak = decrypt_eak(json)
+      @ak_cache[ak_cache_key] = ak
+      ak
+    end
+
+    def put_access_key(writer_id, user_id, reader_id, type, ak)
+      ak_cache_key = [writer_id, user_id, type]
+      @ak_cache[ak_cache_key] = ak
+
+      reader_key = client_key(reader_id)
+      nonce = RbNaCl::Random.random_bytes(RbNaCl::Box.nonce_bytes)
+      eak   = RbNaCl::Box.new(reader_key, @private_key).encrypt(nonce, ak)
+
+      encoded_eak = sprintf('%s.%s', Crypto.base64encode(eak), Crypto.base64encode(nonce))
+
+      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
+      @conn.put(url, { :eak => encoded_eak })
+    end
+
   end
 
   class Crypto
