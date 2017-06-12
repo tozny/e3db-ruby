@@ -160,7 +160,7 @@ version, push git commits and tags, and push the `.gem` file to
 
 General E3DB documentation is [on our web site](https://tozny.com/documentation/e3db/).
 
-Comprehensive documentation for the SDK can be found online [via RubyDoc.info](http://www.rubydoc.info/gems/e3db/1.0.0).
+Comprehensive documentation for the SDK can be found online [via RubyDoc.info](http://www.rubydoc.info/gems/e3db/2.0.0.rc1).
 
 ## Contributing
 
