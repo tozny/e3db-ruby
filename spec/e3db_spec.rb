@@ -1,14 +1,19 @@
 require 'spec_helper'
 require 'securerandom'
 
-# jamesjb scratch profile on development instance
-TEST_SHARE_CLIENT = 'dac7899f-c474-4386-9ab8-f638dcc50dec'
-TEST_EMAIL = 'ijones+feedback@tozny.com'
-
 describe E3DB do
   opts = E3DB::Config.load_profile('integration-test')
   opts.logging = false
   client = E3DB::Client.new(opts)
+
+  # set up the shared client:
+  opts = E3DB::Config.load_profile('integration-test-share')
+  opts.logging = false
+  client2 = E3DB::Client.new(opts)
+
+  # The sharing client data:
+  test_email = client2.config.client_email
+  test_share_client = client2.config.client_id
 
   it 'has a version number' do
     expect(E3DB::VERSION).not_to be nil
@@ -20,7 +25,7 @@ describe E3DB do
   end
 
   it 'can look up a client by e-mail address' do
-    info = client.client_info(TEST_EMAIL)
+    info = client.client_info(test_email)
   end
 
   # TODO: We should throw an E3DB-specific exception.
@@ -179,7 +184,7 @@ describe E3DB do
     rec = client.write(type, {
       :timestamp => DateTime.now.iso8601
     })
-    client.share(type, TEST_SHARE_CLIENT)
+    client.share(type, test_share_client)
   end
 
   it 'can share by e-mail address' do
@@ -187,7 +192,7 @@ describe E3DB do
     rec = client.write(type, {
       :timestamp => DateTime.now.iso8601
     })
-    client.share(type, TEST_EMAIL)
+    client.share(type, test_email)
   end
 
   it 'can list outgoing sharing' do
@@ -195,11 +200,11 @@ describe E3DB do
     rec = client.write(type, {
       :timestamp => DateTime.now.iso8601
     })
-    client.share(type, TEST_SHARE_CLIENT)
+    client.share(type, test_share_client)
 
     found = false
     client.outgoing_sharing.each do |osp|
-      if osp.reader_id == TEST_SHARE_CLIENT and osp.record_type == type
+      if osp.reader_id == test_share_client and osp.record_type == type
         found = true
       end
     end
