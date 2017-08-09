@@ -37,7 +37,10 @@ $ apt-get install libsodium-dev     (Ubuntu)
 For more information including libsodium installation instructions
 for Windows, see the [libsodium web site](https://download.libsodium.org/doc/installation/).
 
-_Windows Users:_ Make sure to download a recent "MSVC" build. Once downloaded, find the most recent `libsodium.dll` inside the ZIP file and copy it to somewhere in your `PATH`.
+_Windows Users:_ Make sure to download a recent "MSVC" build. Once
+downloaded, find the most recent `libsodium.dll` inside the ZIP file,
+rename it to `sodium.dll` and copy it to C:\usr\local\lib. You can
+also copy it to your \Windows\System32 directory.
 
 ## Registering a client
 
