@@ -147,6 +147,7 @@ the E3DB command-line tool:
 
 ```shell
 $ e3db -p integration-test register me+test@mycompany.com
+$ e3db -p integration-test-share register --public=true me+test2@mycompany.com
 ```
 
 After checking out the repo, run `bin/setup` to install dependencies. Then,

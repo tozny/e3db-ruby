@@ -41,6 +41,7 @@ module E3DB
     attribute :client_id, Types::String
     attribute :api_key_id, Types::String
     attribute :api_secret, Types::String
+    attribute :client_email, Types::String
     attribute :public_key, Types::String
     attribute :private_key, Types::String
     attribute :api_url, Types::String.default(DEFAULT_API_URL)
@@ -57,6 +58,7 @@ module E3DB
     #     "client_id": "UUID",
     #     "api_key_id": "API_KEY",
     #     "api_secret": "API_SECRET",
+    #     "client_email": "CLIENT_EMAIL",
     #     "public_key": "PUBLIC_KEY",
     #     "private_key": "PRIVATE_KEY",
     #     "api_url": "URL",
