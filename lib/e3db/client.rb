@@ -464,6 +464,8 @@ module E3DB
       id = @config.client_id
       url = get_url('v1', 'storage', 'policy', id, id, reader_id, type)
       @conn.put(url, JSON.generate({:deny => [{:read => {}}]}))
+
+      delete_access_key(id, id, reader_id, type)
     end
 
     def outgoing_sharing
