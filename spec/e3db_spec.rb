@@ -1,19 +1,66 @@
 require 'spec_helper'
 require 'securerandom'
+require 'rbnacl'
 
 describe E3DB do
-  opts = E3DB::Config.load_profile('integration-test')
-  opts.logging = false
+  token = ENV["REGISTRATION_TOKEN"]
+  api_url = ENV["API_URL"]
+
+  client1_keys = RbNaCl::PrivateKey.generate
+  client1_public_key = E3DB::PublicKey.new(:curve25519 => Base64.urlsafe_encode64(client1_keys.public_key.to_bytes, padding: false))
+  client1_name = sprintf("test_client_%s", SecureRandom.hex)
+  client2_keys = RbNaCl::PrivateKey.generate
+  client2_public_key = E3DB::PublicKey.new(:curve25519 => Base64.urlsafe_encode64(client2_keys.public_key.to_bytes, padding: false))
+  client2_name = sprintf("share_client_%s", SecureRandom.hex)
+
+  test_client1 = E3DB::Client.register(token, client1_name, client1_public_key, api_url)
+  test_client2 = E3DB::Client.register(token, client2_name, client2_public_key, api_url)
+
+  opts = E3DB::Config.new(
+    :version      => 1,
+    :client_id    => test_client1.client_id,
+    :api_key_id   => test_client1.api_key_id,
+    :api_secret   => test_client1.api_secret,
+    :client_email => sprintf('eric+%s@tozny.com', test_client1.name),
+    :public_key   => test_client1.public_key.curve25519,
+    :private_key  => Base64.urlsafe_encode64(client1_keys.to_bytes, padding: false),
+    :api_url      => api_url,
+    :logging      => false
+  )
   client = E3DB::Client.new(opts)
 
   # set up the shared client:
-  opts = E3DB::Config.load_profile('integration-test-share')
-  opts.logging = false
+  opts = E3DB::Config.new(
+      :version      => 1,
+      :client_id    => test_client2.client_id,
+      :api_key_id   => test_client2.api_key_id,
+      :api_secret   => test_client2.api_secret,
+      :client_email => sprintf('eric+%s@tozny.com', test_client2.name),
+      :public_key   => test_client2.public_key.curve25519,
+      :private_key  => Base64.urlsafe_encode64(client2_keys.to_bytes, padding: false),
+      :api_url      => api_url,
+      :logging      => false
+  )
   client2 = E3DB::Client.new(opts)
 
   # The sharing client data:
   test_email = client2.config.client_email
   test_share_client = client2.config.client_id
+
+  it 'can register clients' do
+    keys = RbNaCl::PrivateKey.generate
+    public_key = E3DB::PublicKey.new(:curve25519 => Base64.urlsafe_encode64(keys.public_key.to_bytes, padding: false))
+    name = sprintf("client_%s", SecureRandom.hex)
+
+    test_client = E3DB::Client.register(token, name, public_key, api_url)
+
+    expect(test_client.name).to eq(name)
+    expect(test_client.public_key.curve25519).to eq(public_key.curve25519)
+
+    expect(test_client.client_id).not_to be equal("")
+    expect(test_client.api_key_id).not_to be equal("")
+    expect(test_client.api_secret).not_to be equal("")
+  end
 
   it 'has a version number' do
     expect(E3DB::VERSION).not_to be nil
@@ -24,7 +71,8 @@ describe E3DB do
     expect(info.client_id).to eq(client.config.client_id)
   end
 
-  it 'can look up a client by e-mail address' do
+  # Ignoring test for now until dynamic clients can be referenced by email address
+  pending 'can look up a client by e-mail address' do
     info = client.client_info(test_email)
   end
 
@@ -187,7 +235,8 @@ describe E3DB do
     client.share(type, test_share_client)
   end
 
-  it 'can share by e-mail address' do
+  # Ignoring test for now until dynamic clients can be referenced by email address
+  pending 'can share by e-mail address' do
     type = sprintf('test-share-%s', SecureRandom.uuid)
     rec = client.write(type, {
       :timestamp => DateTime.now.iso8601
