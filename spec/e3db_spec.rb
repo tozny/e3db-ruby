@@ -1,16 +1,16 @@
 require 'spec_helper'
 require 'securerandom'
-require 'rbnacl'
 
 describe E3DB do
   token = ENV["REGISTRATION_TOKEN"]
   api_url = ENV["API_URL"]
 
-  client1_keys = RbNaCl::PrivateKey.generate
-  client1_public_key = E3DB::PublicKey.new(:curve25519 => Base64.urlsafe_encode64(client1_keys.public_key.to_bytes, padding: false))
+  client1_private_key, client1_public_key = E3DB::Client.generate_keypair
+  client2_private_key, client2_public_key = E3DB::Client.generate_keypair
+
+  client1_public_key = E3DB::PublicKey.new(:curve25519 => client1_public_key)
   client1_name = sprintf("test_client_%s", SecureRandom.hex)
-  client2_keys = RbNaCl::PrivateKey.generate
-  client2_public_key = E3DB::PublicKey.new(:curve25519 => Base64.urlsafe_encode64(client2_keys.public_key.to_bytes, padding: false))
+  client2_public_key = E3DB::PublicKey.new(:curve25519 => client2_public_key)
   client2_name = sprintf("share_client_%s", SecureRandom.hex)
 
   test_client1 = E3DB::Client.register(token, client1_name, client1_public_key, api_url)
@@ -23,7 +23,7 @@ describe E3DB do
     :api_secret   => test_client1.api_secret,
     :client_email => sprintf('eric+%s@tozny.com', test_client1.name),
     :public_key   => test_client1.public_key.curve25519,
-    :private_key  => Base64.urlsafe_encode64(client1_keys.to_bytes, padding: false),
+    :private_key  => client1_private_key,
     :api_url      => api_url,
     :logging      => false
   )
@@ -37,7 +37,7 @@ describe E3DB do
       :api_secret   => test_client2.api_secret,
       :client_email => sprintf('eric+%s@tozny.com', test_client2.name),
       :public_key   => test_client2.public_key.curve25519,
-      :private_key  => Base64.urlsafe_encode64(client2_keys.to_bytes, padding: false),
+      :private_key  => client2_private_key,
       :api_url      => api_url,
       :logging      => false
   )
@@ -48,8 +48,8 @@ describe E3DB do
   test_share_client = client2.config.client_id
 
   it 'can register clients' do
-    keys = RbNaCl::PrivateKey.generate
-    public_key = E3DB::PublicKey.new(:curve25519 => Base64.urlsafe_encode64(keys.public_key.to_bytes, padding: false))
+    public_key, _ = E3DB::Client.generate_keypair
+    public_key = E3DB::PublicKey.new(:curve25519 => public_key)
     name = sprintf("client_%s", SecureRandom.hex)
 
     test_client = E3DB::Client.register(token, name, public_key, api_url)

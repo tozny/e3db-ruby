@@ -183,6 +183,13 @@ module E3DB
   class Client
     attr_reader :config
 
+    # Register a new client with a specific account given that account's registration token
+    #
+    # @param registration_token [String] Token for a specific InnoVault account
+    # @param client_name        [String] Unique name for the client being registered
+    # @param public_key         [String] Base64URL-encoded public key component of a Curve25519 keypair
+    # @param api_url            [String] Optional URL of the API against which to register
+    # @return [ClientDetails] Credentials and details about the newly-created client
     def self.register(registration_token, client_name, public_key, api_url=E3DB::DEFAULT_API_URL)
       url = sprintf('%s/%s', api_url.chomp('/'), 'v1/account/e3db/clients/register')
       payload = JSON.generate({:token => registration_token, :client => {:name => client_name, :public_key => {:curve25519 => public_key.curve25519}}})
@@ -195,6 +202,15 @@ module E3DB
 
       resp = conn.post(url, payload)
       ClientDetails.new(JSON.parse(resp.body, symbolize_names: true))
+    end
+
+    # Generate a random Curve25519 keypair
+    #
+    # @return [String, String] Public and private keys (respectively) for the new keypair
+    def self.generate_keypair
+      keys = RbNaCl::PrivateKey.generate
+
+      return Crypto.encode_public_key(keys.public_key), Crypto.encode_private_key(keys)
     end
 
     # Create a connection to the E3DB service given a configuration.
