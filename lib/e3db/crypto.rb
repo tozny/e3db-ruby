@@ -107,6 +107,14 @@ module E3DB
       @conn.put(url, { :eak => encoded_eak })
     end
 
+    def delete_access_key(writer_id, user_id, reader_id, type)
+      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
+      @conn.delete(url)
+
+      ak_cache_key = [writer_id, user_id, type]
+      @ak_cache.delete(ak_cache_key)
+    end
+
   end
 
   class Crypto
