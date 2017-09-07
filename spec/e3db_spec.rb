@@ -13,8 +13,8 @@ describe E3DB do
   client2_public_key = E3DB::PublicKey.new(:curve25519 => client2_public_key)
   client2_name = sprintf("share_client_%s", SecureRandom.hex)
 
-  test_client1 = E3DB::Client.register(token, client1_name, client1_public_key, api_url)
-  test_client2 = E3DB::Client.register(token, client2_name, client2_public_key, api_url)
+  test_client1 = E3DB::Client.register(token, client1_name, client1_public_key, nil, false, api_url)
+  test_client2 = E3DB::Client.register(token, client2_name, client2_public_key, nil, false, api_url)
 
   opts = E3DB::Config.new(
     :version      => 1,
@@ -52,7 +52,7 @@ describe E3DB do
     public_key = E3DB::PublicKey.new(:curve25519 => public_key)
     name = sprintf("client_%s", SecureRandom.hex)
 
-    test_client = E3DB::Client.register(token, name, public_key, api_url)
+    test_client = E3DB::Client.register(token, name, public_key, nil, false, api_url)
 
     expect(test_client.name).to eq(name)
     expect(test_client.public_key.curve25519).to eq(public_key.curve25519)
