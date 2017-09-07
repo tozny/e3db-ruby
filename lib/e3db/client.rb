@@ -188,6 +188,8 @@ module E3DB
     # @param registration_token [String]  Token for a specific InnoVault account
     # @param client_name        [String]  Unique name for the client being registered
     # @param public_key         [String]  Base64URL-encoded public key component of a Curve25519 keypair
+    # @param private_key        [String]  Optional Curve25519 private key component used to sign the backup key
+    # @param backup             [Boolean] Optional flag to automatically back up the newly-created credentials to the account service
     # @param api_url            [String]  Optional URL of the API against which to register
     # @return [ClientDetails] Credentials and details about the newly-created client
     def self.register(registration_token, client_name, public_key, private_key=nil, backup=true, api_url=E3DB::DEFAULT_API_URL)
@@ -214,7 +216,7 @@ module E3DB
             :client_email => '',
             :public_key   => public_key.curve25519,
             :private_key  => private_key,
-            :api_url      => 'https://dev.e3db.com',
+            :api_url      => 'https://api.e3db.com',
             :logging      => false
         )
         client = E3DB::Client.new(config)
