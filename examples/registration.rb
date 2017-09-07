@@ -41,6 +41,14 @@ puts("Client Name: " + client_name)
 # a new client with the system. Remember to keep your private key private!
 client_info = E3DB::Client.register(token, client_name, wrapped_key)
 
+# Optionally, you can automatically back up the credentials of the newly-created
+# client to your InnoVault account (accessible via https://console.tozny.com) by
+# passing your private key and a backup flag when registering. The private key is
+# not sent anywhere, but is used by the newly-created client to sign an encrypted
+# copy of its credentials that is itself stored in e3db for later use.
+
+# client_info = E3DB::Client.register(token, client_name, wrapped_key, private_key, true)
+
 puts("Client ID:   " + client_info.client_id)
 puts("API Key ID:  " + client_info.api_key_id)
 puts("API Secret:  " + client_info.api_secret)
