@@ -21,7 +21,7 @@ token = ENV["REGISTRATION_TOKEN"]
 
 # Clients can either create new cryptographic keypairs, or load in a pre-defined
 # pair of Curve25519 keys. In this situation, we will generate a new keypair.
-private_key, public_key = E3DB::Client.generate_keypair
+public_key, private_key = E3DB::Client.generate_keypair
 
 puts("Public Key:  " + public_key)
 puts("Private Key: " + private_key)
