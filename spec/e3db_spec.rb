@@ -234,7 +234,7 @@ describe E3DB do
     })
     client.share(type, test_share_client)
 
-    rec2 = test_share_client.read(rec.meta.record_id)
+    rec2 = client2.read(rec.meta.record_id)
     expect(rec.data).to eq(rec2.data)
   end
 
