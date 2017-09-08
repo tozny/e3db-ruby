@@ -192,7 +192,7 @@ module E3DB
     # @param backup             [Boolean] Optional flag to automatically back up the newly-created credentials to the account service
     # @param api_url            [String]  Optional URL of the API against which to register
     # @return [ClientDetails] Credentials and details about the newly-created client
-    def self.register(registration_token, client_name, public_key, private_key=nil, backup=true, api_url=E3DB::DEFAULT_API_URL)
+    def self.register(registration_token, client_name, public_key, private_key=nil, backup=false, api_url=E3DB::DEFAULT_API_URL)
       url = sprintf('%s/%s', api_url.chomp('/'), 'v1/account/e3db/clients/register')
       payload = JSON.generate({:token => registration_token, :client => {:name => client_name, :public_key => {:curve25519 => public_key.curve25519}}})
 

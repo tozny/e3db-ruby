@@ -5,8 +5,8 @@ describe E3DB do
   token = ENV["REGISTRATION_TOKEN"]
   api_url = ENV["API_URL"]
 
-  client1_private_key, client1_public_key = E3DB::Client.generate_keypair
-  client2_private_key, client2_public_key = E3DB::Client.generate_keypair
+  client1_public_key, client1_private_key = E3DB::Client.generate_keypair
+  client2_public_key, client2_private_key = E3DB::Client.generate_keypair
 
   client1_public_key = E3DB::PublicKey.new(:curve25519 => client1_public_key)
   client1_name = sprintf("test_client_%s", SecureRandom.hex)
