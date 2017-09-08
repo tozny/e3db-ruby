@@ -206,7 +206,7 @@ module E3DB
       client_info = ClientDetails.new(JSON.parse(resp.body, symbolize_names: true))
       backup_client_id = resp.headers['x-backup-client']
 
-      if backup
+      if backup && ! private_key.nil?
         # Instantiate a client
         config = E3DB::Config.new(
             :version      => 1,
