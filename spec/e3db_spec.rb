@@ -233,6 +233,9 @@ describe E3DB do
       :timestamp => DateTime.now.iso8601
     })
     client.share(type, test_share_client)
+
+    rec2 = test_share_client.read(rec.meta.record_id)
+    expect(rec.data).to eq(rec2.data)
   end
 
   # Ignoring test for now until dynamic clients can be referenced by email address
