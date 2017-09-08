@@ -185,12 +185,14 @@ module E3DB
 
     # Register a new client with a specific account given that account's registration token
     #
-    # @param registration_token [String] Token for a specific InnoVault account
-    # @param client_name        [String] Unique name for the client being registered
-    # @param public_key         [String] Base64URL-encoded public key component of a Curve25519 keypair
-    # @param api_url            [String] Optional URL of the API against which to register
+    # @param registration_token [String]  Token for a specific InnoVault account
+    # @param client_name        [String]  Unique name for the client being registered
+    # @param public_key         [String]  Base64URL-encoded public key component of a Curve25519 keypair
+    # @param private_key        [String]  Optional Curve25519 private key component used to sign the backup key
+    # @param backup             [Boolean] Optional flag to automatically back up the newly-created credentials to the account service
+    # @param api_url            [String]  Optional URL of the API against which to register
     # @return [ClientDetails] Credentials and details about the newly-created client
-    def self.register(registration_token, client_name, public_key, api_url=E3DB::DEFAULT_API_URL)
+    def self.register(registration_token, client_name, public_key, private_key=nil, backup=false, api_url=E3DB::DEFAULT_API_URL)
       url = sprintf('%s/%s', api_url.chomp('/'), 'v1/account/e3db/clients/register')
       payload = JSON.generate({:token => registration_token, :client => {:name => client_name, :public_key => {:curve25519 => public_key.curve25519}}})
 
@@ -201,7 +203,33 @@ module E3DB
       end
 
       resp = conn.post(url, payload)
-      ClientDetails.new(JSON.parse(resp.body, symbolize_names: true))
+      client_info = ClientDetails.new(JSON.parse(resp.body, symbolize_names: true))
+      backup_client_id = resp.headers['x-backup-client']
+
+      if backup
+        if private_key.nil
+          raise 'Cannot back up client credentials without a private key!'
+        end
+
+        # Instantiate a client
+        config = E3DB::Config.new(
+            :version      => 1,
+            :client_id    => client_info.client_id,
+            :api_key_id   => client_info.api_key_id,
+            :api_secret   => client_info.api_secret,
+            :client_email => '',
+            :public_key   => public_key.curve25519,
+            :private_key  => private_key,
+            :api_url      => 'https://api.e3db.com',
+            :logging      => false
+        )
+        client = E3DB::Client.new(config)
+
+        # Back the client up
+        client.backup(backup_client_id, registration_token)
+      end
+
+      client_info
     end
 
     # Generate a random Curve25519 keypair
@@ -342,6 +370,31 @@ module E3DB
     # @param record_id [String] unique ID of record to delete
     def delete(record_id)
       resp = @conn.delete(get_url('v1', 'storage', 'records', record_id))
+    end
+
+    # Back up the client's configuration to E3DB in a serialized format that can be read
+    # by the Admin Console. The stored configuration will be shared with the specified client,
+    # and the account service notified that the sharing has taken place.
+    #
+    # @param client_id          [String] Unique ID of the client to which we're backing up
+    # @param registration_token [String] Original registration token used to create the client
+    def backup(client_id, registration_token)
+      credentials = {
+          :version      => '1',
+          :client_id    => @config.client_id.to_json,
+          :api_key_id   => @config.api_key_id.to_json,
+          :api_secret   => @config.api_secret.to_json,
+          :client_email => @config.client_email.to_json,
+          :public_key   => @config.public_key.to_json,
+          :private_key  => @config.private_key.to_json,
+          :api_url      => @config.api_url.to_json
+      }
+
+      write('tozny.key_backup', credentials, {:client => @config.client_id})
+      share('tozny.key_backup', client_id)
+
+      url = get_url('v1', 'account', 'backup', registration_token, @config.client_id)
+      @conn.post(url)
     end
 
     class Query < Dry::Struct
