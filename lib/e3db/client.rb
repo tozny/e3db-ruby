@@ -207,7 +207,7 @@ module E3DB
       backup_client_id = resp.headers['x-backup-client']
 
       if backup
-        if private_key.nil
+        if private_key.nil?
           raise 'Cannot back up client credentials without a private key!'
         end
 
@@ -220,7 +220,7 @@ module E3DB
             :client_email => '',
             :public_key   => public_key.curve25519,
             :private_key  => private_key,
-            :api_url      => 'https://api.e3db.com',
+            :api_url      => api_url,
             :logging      => false
         )
         client = E3DB::Client.new(config)
