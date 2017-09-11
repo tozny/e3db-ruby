@@ -44,17 +44,35 @@ also copy it to your \Windows\System32 directory.
 
 ## Registering a client
 
-1. Download and install the E3DB Command-Line interface (CLI) from our
-   [GitHub releases page](https://github.com/tozny/e3db-go/releases).
+Register an account with [InnoVault](https://inoovault.io) to get started. From the Admin Console you can create clients directly (and grab their credentials from the console) or create registration tokens to dynamically create clients with `E3DB::Client.register()`. Clients registered from within the console will automatically back their credentials up to your account. Clients created dynamically via the SDK can _optionally_ back their credentials up to your account.
 
-2. Register an account using the CLI:
+For a more complete walkthrough, see [`/examples/registration.rb`](https://github.com/tozny/e3db-ruby/blob/master/examples/registration.rb).
 
-   ```shell
-   $ e3db register me@mycompany.com
-   ```
+### Without Credential Backup
 
-   This will create a new default configuration with a randomly
-   generated key pair and API credentials, saving it in `$HOME/.tozny/e3db.json`.
+```ruby
+token = '...'
+client_name = '...'
+
+public_key, private_key = E3DB::Client.generate_keypair
+wrapped_key = E3DB::PublicKey.new(:curve25519 => public_key)
+client_info = E3DB::Client.register(token, client_name, wrapped_key)
+```
+
+The object returned from the server contains the client's UUID, API key, and API secret (as well as echos back the public key passed during registration). It's your responsibility to store this information locally as it _will not be recoverable_ without credential backup.
+
+### With Credential Backup
+   
+```ruby
+token = '...'
+client_name = '...'
+
+public_key, private_key = E3DB::Client.generate_keypair
+wrapped_key = E3DB::PublicKey.new(:curve25519 => public_key)
+client_info = E3DB::Client.register(token, client_name, wrapped_key, private_key, true)
+```
+
+The private key must be passed to the registration handler when backing up credentials as it is used to cryptographically sign the encrypted backup file stored on the server. The private key never leaves the system, and the stored credentials will only be accessible to the newly-registered client itself or the account with which it is registered.
 
 ## Loading configuration and creating a client
 
