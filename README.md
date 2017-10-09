@@ -159,18 +159,23 @@ See the [simple example code](examples/simple.rb) for runnable detailed examples
 ## Development
 
 Before running tests, register an account with
-[InnoVault](https://innovault.io), and generate a client. Export the client
-token as the environment variable `REGISTRATION_TOKEN`.
+[InnoVault](https://innovault.io), and generate a client token.
 
-After checking out the repo, run `bin/setup` to install dependencies. Then,
-run `rake spec` to run the tests. You can also run `bin/console` for an
-interactive prompt that will allow you to experiment.
+After checking out the repo, run `bin/setup` to install dependencies. Next,
+set two environment variables:
 
-To install this gem onto your local machine, run `bundle exec rake install`.
-To release a new version, update the version number in `version.rb`, and
-then run `bundle exec rake release`, which will create a git tag for the
-version, push git commits and tags, and push the `.gem` file to
-[rubygems.org](https://rubygems.org).
+* API_URL - E3DB host to run tests against.
+* REGISTRATION_TOKEN - A token obtained from InnoVault that can be used
+  to register E3DB clients.
+
+Run `rake spec` to run the tests. You can also run `bin/console` for
+an interactive prompt that will allow you to experiment.
+
+To install this gem onto your local machine, run `bundle exec rake
+install`. To release a new version, update the version number in
+`version.rb`, and then run `bundle exec rake release`, which will
+create a git tag for the version, push git commits and tags, and push
+the `.gem` file to [rubygems.org](https://rubygems.org).
 
 ## Documentation
 
