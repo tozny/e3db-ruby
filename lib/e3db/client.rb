@@ -188,13 +188,13 @@ module E3DB
     # @param registration_token [String]  Token for a specific InnoVault account
     # @param client_name        [String]  Unique name for the client being registered
     # @param public_key         [String]  Base64URL-encoded public key component of a Curve25519 keypair
-    # @param private_key        [String]  Optional Curve25519 private key component used to sign the backup key
+    # @param private_key        [String]  Optional Base64URL-encoded private key component of a Curve25519 keypair
     # @param backup             [Boolean] Optional flag to automatically back up the newly-created credentials to the account service
     # @param api_url            [String]  Optional URL of the API against which to register
     # @return [ClientDetails] Credentials and details about the newly-created client
     def self.register(registration_token, client_name, public_key, private_key=nil, backup=false, api_url=E3DB::DEFAULT_API_URL)
       url = sprintf('%s/%s', api_url.chomp('/'), 'v1/account/e3db/clients/register')
-      payload = JSON.generate({:token => registration_token, :client => {:name => client_name, :public_key => {:curve25519 => public_key.curve25519}}})
+      payload = JSON.generate({:token => registration_token, :client => {:name => client_name, :public_key => {:curve25519 => public_key}}})
 
       conn = Faraday.new(api_url) do |faraday|
         faraday.request :json
@@ -218,7 +218,7 @@ module E3DB
             :api_key_id   => client_info.api_key_id,
             :api_secret   => client_info.api_secret,
             :client_email => '',
-            :public_key   => public_key.curve25519,
+            :public_key   => public_key,
             :private_key  => private_key,
             :api_url      => api_url,
             :logging      => false
@@ -234,7 +234,7 @@ module E3DB
 
     # Generate a random Curve25519 keypair
     #
-    # @return [String, String] Public and private keys (respectively) for the new keypair
+    # @return [String, String] Base64URL-encoded public and private keys (respectively) for the new keypair
     def self.generate_keypair
       keys = RbNaCl::PrivateKey.generate
 
