@@ -9,8 +9,8 @@
 require 'e3db/version'
 require 'e3db/types'
 require 'e3db/config'
-require 'e3db/client'
 require 'e3db/crypto'
+require 'e3db/client'
 
 # Ruby client library for the Tozny End-to-End Encrypted Database (E3DB) service.
 #

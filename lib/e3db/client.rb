@@ -66,6 +66,8 @@ module E3DB
   #   @return [String] the client's unique ID string
   # @!attribute public_key
   #   @return [PublicKey] the client's public key information
+  # @!attribute validated
+  #   @return [Bool]
   class ClientInfo < Dry::Struct
     attribute :client_id, Types::Strict::String
     attribute :public_key, PublicKey
@@ -73,7 +75,17 @@ module E3DB
   end
 
   # Information about a newly-created E3DB client
-
+  #
+  # @!attribute client_id
+  #   @return [String] the client's unique ID string
+  # @!attribute api_key_id
+  #   @return [String]
+  # @!attribute api_secret
+  #   @return [String]
+  # @!attribute public_key
+  #   @return [PublicKey] the client's public key information
+  # @!attribute name
+  #   @return [String] the client's name.
   class ClientDetails < Dry::Struct
     attribute :client_id, Types::Strict::String
     attribute :api_key_id, Types::Strict::String
@@ -176,11 +188,27 @@ module E3DB
     attribute :record_type, Types::Strict::String
   end
 
+  # Represents an encrypted secret key that can
+  # be used to encrypt and decrypt records.
+  #
+  # Should only be obtained by calling {Client#create_writer_key}
+  # or {Client#get_reader_key}.
+  class EAK < Dry::Struct
+    attribute :eak, Types::Strict::String
+    attribute :authorizer_public_key, PublicKey
+    attribute :authorizer_id, Types::Strict::String
+  end
+
   # A connection to the E3DB service used to perform database operations.
   #
   # @!attribute [r] config
   #   @return [Config] the client configuration object
   class Client
+    include Crypto
+    class << self
+      include Crypto
+    end
+
     attr_reader :config
 
     # Register a new client with a specific account given that account's registration token
@@ -193,7 +221,7 @@ module E3DB
     # @param api_url            [String]  Optional URL of the API against which to register
     # @return [ClientDetails] Credentials and details about the newly-created client
     def self.register(registration_token, client_name, public_key, private_key=nil, backup=false, api_url=E3DB::DEFAULT_API_URL)
-      url = sprintf('%s/%s', api_url.chomp('/'), 'v1/account/e3db/clients/register')
+      url = "#{api_url.chomp('/')}/v1/account/e3db/clients/register"
       payload = JSON.generate({:token => registration_token, :client => {:name => client_name, :public_key => {:curve25519 => public_key}}})
 
       conn = Faraday.new(api_url) do |faraday|
@@ -232,13 +260,13 @@ module E3DB
       client_info
     end
 
-    # Generate a random Curve25519 keypair
+    # Generate a random Curve25519 keypair.
     #
-    # @return [String, String] Base64URL-encoded public and private keys (respectively) for the new keypair
+    # @return [Array<String>] A two element array containing the public and private keys (respectively) for the new keypair.
     def self.generate_keypair
       keys = RbNaCl::PrivateKey.generate
 
-      return Crypto.encode_public_key(keys.public_key), Crypto.encode_private_key(keys)
+      return encode_public_key(keys.public_key), encode_private_key(keys)
     end
 
     # Create a connection to the E3DB service given a configuration.
@@ -247,10 +275,9 @@ module E3DB
     # @return [Client] a connection to the E3DB service
     def initialize(config)
       @config = config
-      @public_key = RbNaCl::PublicKey.new(Crypto.base64decode(@config.public_key))
-      @private_key = RbNaCl::PrivateKey.new(Crypto.base64decode(@config.private_key))
+      @public_key = RbNaCl::PublicKey.new(base64decode(@config.public_key))
+      @private_key = RbNaCl::PrivateKey.new(base64decode(@config.private_key))
 
-      @ak_cache = LruRedux::ThreadSafeCache.new(1024)
       @oauth_client = OAuth2::Client.new(
           config.api_key_id,
           config.api_secret,
@@ -272,6 +299,8 @@ module E3DB
         end
         faraday.adapter :net_http_persistent
       end
+
+      @ak_cache = LruRedux::ThreadSafeCache.new(1024)
     end
 
     # Query the server for information about an E3DB client.
@@ -281,7 +310,7 @@ module E3DB
     def client_info(client_id)
       if client_id.include? "@"
         base_url = get_url('v1', 'storage', 'clients', 'find')
-        url = base_url + sprintf('?email=%s', CGI.escape(client_id))
+        url = "#{base_url}?email=#{CGI.escape(client_id)}"
         resp = @conn.post(url)
       else
         resp = @conn.get(get_url('v1', 'storage', 'clients', client_id))
@@ -298,7 +327,7 @@ module E3DB
       if client_id == @config.client_id
         @public_key
       else
-        Crypto.decode_public_key(client_info(client_id).public_key.curve25519)
+        decode_public_key(client_info(client_id).public_key.curve25519)
       end
     end
 
@@ -318,7 +347,12 @@ module E3DB
     # @param record_id [String] record ID to look up
     # @return [Record] decrypted record object
     def read(record_id)
-      decrypt_record(read_raw(record_id))
+      resp = @conn.get(get_url('v1', 'storage', 'records', record_id))
+      record = Record.new(JSON.parse(resp.body, symbolize_names: true))
+      writer_id = record.meta.writer_id
+      user_id = record.meta.user_id
+      type = record.meta.type
+      decrypt_record(record, get_eak(writer_id, user_id, type))
     end
 
     # Write a new record to the E3DB storage service.
@@ -326,16 +360,23 @@ module E3DB
     # @param type [String] free-form content type name of this record
     # @param data [Hash<String, String>] record data to be stored encrypted
     # @param plain [Hash<String, String>] record data to be stored unencrypted for querying
-    # @return [Record] the newly created record object
+    # @return [Record] the newly created record object (with decrypted values).
     def write(type, data, plain=Hash.new)
       url = get_url('v1', 'storage', 'records')
       id = @config.client_id
-      meta = Meta.new(record_id: nil, writer_id: id, user_id: id,
-                      type: type, plain: plain, created: nil,
-                      last_modified: nil, version: nil)
-      record = Record.new(meta: meta, data: data)
-      resp = @conn.post(url, encrypt_record(record).to_hash)
-      decrypt_record(Record.new(JSON.parse(resp.body, symbolize_names: true)))
+
+      begin
+        eak = get_eak(id, id, type)
+      rescue Faraday::ClientError => e
+        if e.response[:status] == 404
+          eak = create_writer_key(type)
+        else
+          raise e
+        end
+      end
+
+      resp = @conn.post(url, encrypt_new_record(type, data, plain, id, eak).to_hash)
+      decrypt_record(resp.body, eak)
     end
 
     # Update an existing record in the E3DB storage service.
@@ -348,36 +389,45 @@ module E3DB
     # the new version number and modification time returned by the server.
     #
     # @param record [Record] the record to update
+    # @return [Nil] Always returns nil.
     def update(record)
       record_id = record.meta.record_id
       version = record.meta.version
       url = get_url('v1', 'storage', 'records', 'safe', record_id, version)
+
       begin
-        resp = @conn.put(url, encrypt_record(record).to_hash)
+        type = record.meta.type
+        encrypted_record = encrypt_record(record, get_eak(@config.client_id, @config.client_id, record.meta.type))
+        resp = @conn.put(url, encrypted_record.to_hash)
+        json = JSON.parse(resp.body, symbolize_names: true)
+        record.meta = Meta.new(json[:meta])
+        nil
       rescue Faraday::ClientError => e
         if e.response[:status] == 409
           raise E3DB::ConflictError, record
         else
           raise e   # re-raise on other failures
         end
-      end
-      json = JSON.parse(resp.body, symbolize_names: true)
-      record.meta = Meta.new(json[:meta])
+     end
     end
 
     # Delete a record from the E3DB storage service.
     #
     # @param record_id [String] unique ID of record to delete
+    # @return [Nil] Always returns nil.
     def delete(record_id)
-      resp = @conn.delete(get_url('v1', 'storage', 'records', record_id))
+      @conn.delete(get_url('v1', 'storage', 'records', record_id))
+      nil
     end
 
-    # Back up the client's configuration to E3DB in a serialized format that can be read
-    # by the Admin Console. The stored configuration will be shared with the specified client,
-    # and the account service notified that the sharing has taken place.
+    # Back up the client's configuration to E3DB in a serialized
+    # format that can be read by the Admin Console. The stored
+    # configuration will be shared with the specified client, and the
+    # account service notified that the sharing has taken place.
     #
     # @param client_id          [String] Unique ID of the client to which we're backing up
     # @param registration_token [String] Original registration token used to create the client
+    # @return [Nil] Always returns nil.
     def backup(client_id, registration_token)
       credentials = {
           :version      => '1',
@@ -395,6 +445,8 @@ module E3DB
 
       url = get_url('v1', 'account', 'backup', registration_token, @config.client_id)
       @conn.post(url)
+
+      nil
     end
 
     class Query < Dry::Struct
@@ -431,6 +483,7 @@ module E3DB
     # fetch all records into an array first.
     class Result
       include Enumerable
+      include Crypto
 
       def initialize(client, query, raw)
         @client = client
@@ -449,18 +502,16 @@ module E3DB
           json = @client.instance_eval { query1(q) }
           results = json[:results]
           results.each do |r|
-            record = Record.new(meta: r[:meta], data: r[:record_data] || Hash.new)
-            if q.include_data && !@raw
-              access_key = r[:access_key]
-              if access_key
-                record = @client.instance_eval {
-                  ak = decrypt_eak(access_key)
-                  decrypt_record_with_key(record, ak)
-                }
+            if q.include_data
+              if !@raw
+                record = @client.decrypt_record(Record.new({ :meta => r[:meta], :data => r[:record_data] }), EAK.new(r[:access_key]))
               else
-                record = @client.instance_eval { decrypt_record(record) }
+                record = Record.new(data: r[:record_data], meta: Meta.new(r[:meta]))
               end
+            else
+              record = Record.new(data: Hash.new, meta: Meta.new(r[:meta]))
             end
+
             yield record
           end
 
@@ -528,6 +579,7 @@ module E3DB
     #
     # @param type [String] type of records to share
     # @param reader_id [String] client ID or e-mail address of reader to grant access to
+    # @return [Nil] Always returns nil.
     def share(type, reader_id)
       if reader_id == @config.client_id
         return
@@ -536,17 +588,26 @@ module E3DB
       end
 
       id = @config.client_id
-      ak = get_access_key(id, id, id, type)
-      put_access_key(id, id, reader_id, type, ak)
+      ak = get_access_key(id, id, type)
+
+      begin
+        put_access_key(id, id, reader_id, type, ak)
+      rescue Faraday::ClientError => e
+        # Ignore 403, means AK already exists.
+        if e.response[:status] != 403
+          raise e
+        end
+      end
 
       url = get_url('v1', 'storage', 'policy', id, id, reader_id, type)
       @conn.put(url, JSON.generate({:allow => [{:read => {}}]}))
+      nil
     end
 
     # Revoke another E3DB client's access to records of a particular type.
     #
     # @param type [String] type of records to revoke access to
-    # @param reader_id [String] client ID of reader to revoke access from
+    # @param reader_id [String] client ID of reader to revoke access from    # @return [Nil] Always returns nil.
     def revoke(type, reader_id)
       if reader_id == @config.client_id
         return
@@ -559,8 +620,13 @@ module E3DB
       @conn.put(url, JSON.generate({:deny => [{:read => {}}]}))
 
       delete_access_key(id, id, reader_id, type)
+      nil
     end
 
+    # Gets a list of record types that this client has shared with
+    # others.
+    #
+    # @return [Array<OutgoingSharingPolicy>]
     def outgoing_sharing
       url = get_url('v1', 'storage', 'policy', 'outgoing')
       resp = @conn.get(url)
@@ -568,6 +634,10 @@ module E3DB
       return json.map {|x| OutgoingSharingPolicy.new(x)}
     end
 
+    # Gets a list of record types that others have shared with this
+    # client.
+    #
+    # @return [Array<IncomingSharingPolicy>]
     def incoming_sharing
       url = get_url('v1', 'storage', 'policy', 'incoming')
       resp = @conn.get(url)
@@ -575,7 +645,200 @@ module E3DB
       return json.map {|x| IncomingSharingPolicy.new(x)}
     end
 
+    # Create and return an (encrypted) secret key for encrypting the
+    # given record type. Can be saved for use with {#encrypt_record},
+    # {#encrypt_new_record} and {#decrypt_record} later.
+    #
+    # @return [EAK]
+    def create_writer_key(type)
+      id = @config.client_id
+      begin
+        put_access_key(id, id, id, type, new_access_key)
+      rescue Faraday::ClientError => e
+        # Ignore 403, as it means a key already exists. Otherwise, raise.
+        if e.response[:status] != 403
+          raise e
+        end
+      end
+
+      get_eak(id, id, type)
+    end
+
+    # Retrieve an (encrypted) key for reading records written by the
+    # given writer for the given user with the given type (assuming
+    # the writer previously established sharing with this client).
+    #
+    # @return [EAK]
+    def get_reader_key(writer_id, user_id, type)
+      get_eak(writer_id, user_id, type)
+    end
+
+    # Encrypts a record, using the encrypted key provided.
+    #
+    # +plain_record+ should be a Record instance to encrypt. +eak+ should
+    # be an encrypted secret key, obtained via {#create_writer_key}.
+    #
+    # @return [Record] An instace containg the encrypted data.
+    def encrypt_record(plain_record, eak)
+      cache_key = [plain_record.meta.writer_id, plain_record.meta.user_id, plain_record.meta.type]
+      if ! @ak_cache.has_key? cache_key
+        @ak_cache[cache_key] = { :eak => eak, :ak => decrypt_box(eak.eak, eak.authorizer_public_key.curve25519, @private_key) }
+      end
+      ak = @ak_cache[cache_key][:ak]
+
+      encrypted_record = Record.new(meta: plain_record.meta, data: Hash.new)
+      plain_record.data.each do |k, v|
+        dk =   new_data_key
+        efN =  secret_box_random_nonce
+        ef =   RbNaCl::SecretBox.new(dk).encrypt(efN, v)
+
+        edkN = secret_box_random_nonce
+        edk =  RbNaCl::SecretBox.new(ak).encrypt(edkN, dk)
+
+        encrypted_record.data[k] = [edk, edkN, ef, efN].map { |f| base64encode(f) }.join(".")
+      end
+
+      encrypted_record
+    end
+
+    # Encrypt a new record consisting of the given data.
+    #
+    # +type+ is a string giving the record type. +data+ should be a
+    # dictionary of string values. +plain+ should be a dictionary of
+    # string values. +id+ should be the ID of the client creating the
+    # record. +eak+ should be an encrypted secret key, obtained via
+    # {#create_writer_key}.
+    #
+    # @return [Record] An instance containing the encrypted data.
+    def encrypt_new_record(type, data, plain, id, eak)
+      meta = Meta.new(record_id: nil, writer_id: id, user_id: id,
+                      type: type, plain: plain, created: nil,
+                      last_modified: nil, version: nil)
+
+      encrypt_record(Record.new(:meta => meta, :data => data), eak)
+    end
+
+    # Decrypts a record using the given secret key.
+    #
+    # The record should be either a JSON document (as a string) or a
+    # Record instance. +eak+ should be an encrypted secret key,
+    # obtained via {#get_reader_key}.
+    #
+    # @return [Record] An instance containing the decrypted data.
+    def decrypt_record(encrypted_record, eak)
+      encrypted_record = Record.new(JSON.parse(encrypted_record, symbolize_names: true)) if encrypted_record.is_a? String
+      raise 'Can only decrypt JSON string or Record instance.' if ! encrypted_record.is_a? Record
+
+      cache_key = [encrypted_record.meta.writer_id, encrypted_record.meta.user_id, encrypted_record.meta.type]
+      if ! @ak_cache.has_key? cache_key
+        @ak_cache[cache_key] = { :eak => eak, :ak => decrypt_box(eak.eak, eak.authorizer_public_key.curve25519, @private_key) }
+      end
+      ak = @ak_cache[cache_key][:ak]
+
+      plain_record = Record.new(data: Hash.new, meta: Meta.new(encrypted_record.meta))
+      encrypted_record[:data].each do |k, v|
+        edk, edkN, ef, efN = v.split('.', 4).map { |f| base64decode(f) }
+
+        dk = RbNaCl::SecretBox.new(ak).decrypt(edkN, edk)
+        pv = RbNaCl::SecretBox.new(dk).decrypt(efN, ef)
+
+        plain_record.data[k] = pv
+      end
+
+      plain_record
+    end
+
     private
+
+    # Returns the encrypted access key for this client for the
+    # given writer/user/type combination. Throws
+    # Faraday::ResourceNotFound if the key does not exist.
+    #
+    # Returns an instance of E3DB::EAK.
+    def get_eak(writer_id, user_id, type)
+      get_cached_key(writer_id, user_id, type)[:eak]
+    end
+
+    # Retrieve the access key for the given combination of writer,
+    # user and typ with this client as reader. Throws
+    # Faraday::ResourceNotFound if the key does not exist.
+    #
+    # Returns an string of bytes representing the access key.
+    def get_access_key(writer_id, user_id, type)
+      get_cached_key(writer_id, user_id, type)[:ak]
+    end
+
+    # Manages EAK caching, and goes to the server if a given access
+    # key has not been fetched. Throws Faraday::ResourceNotFound if
+    # the key does not exist.
+    #
+    # Returns a dictionary with +:eak+ and +:ak+ entries (containing
+    # the encrypted and unencrypted versions of the key,
+    # respectively).
+    def get_cached_key(writer_id, user_id, type)
+      cache_key = [writer_id, user_id, type]
+      if @ak_cache.has_key? cache_key
+        @ak_cache[cache_key]
+      else
+        url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, @config.client_id, type)
+        json = JSON.parse(@conn.get(url).body, symbolize_names: true)
+        @ak_cache[cache_key] = {
+          :eak => EAK.new(json),
+          :ak => decrypt_box(json[:eak], json[:authorizer_public_key][:curve25519], @private_key)
+        }
+      end
+    end
+
+    # Store an access key for the given combination of writer, user,
+    # reader and type. `ak` should be an string of bytes representing
+    # the access key.
+    #
+    # If an access key for the given combination exists, this method
+    # will have no effect.
+    #
+    # Returns +nil+ in all cases.
+    def put_access_key(writer_id, user_id, reader_id, type, ak)
+      if reader_id == @client_id
+        reader_key = @public_key
+      else
+        resp = @conn.get(get_url('v1', 'storage', 'clients', reader_id))
+        reader_key = decode_public_key(JSON.parse(resp.body, symbolize_names: true)[:public_key][:curve25519])
+      end
+
+      encoded_eak = encrypt_box(ak, reader_key, @private_key)
+
+      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
+      resp = @conn.put(url, { :eak => encoded_eak })
+      cache_key = [writer_id, user_id, type]
+      @ak_cache[cache_key] = {
+        ak: ak,
+        eak: EAK.new(
+          {
+            eak: encoded_eak,
+            authorizer_public_key: {
+              curve25519: encode_public_key(reader_key)
+            },
+            authorizer_id: @config.client_id
+          }
+        )
+      }
+
+      nil
+    end
+
+    # Delete the access key for the given combinatino of writer, user,
+    # reader and type.
+    #
+    # Returns nil in all cases.
+    def delete_access_key(writer_id, user_id, reader_id, type)
+      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
+      @conn.delete(url)
+
+      cache_key = [writer_id, user_id, type]
+      @ak_cache.delete(cache_key)
+
+      nil
+    end
 
     # Fetch a single page of query results. Used internally by {Client#query}.
     def query1(query)
@@ -585,7 +848,7 @@ module E3DB
     end
 
     def get_url(*paths)
-      sprintf('%s/%s', @config.api_url.chomp('/'), paths.map { |x| CGI.escape x }.join('/'))
+      "#{@config.api_url.chomp('/')}/#{ paths.map { |x| CGI.escape x }.join('/')}"
     end
   end
 end
