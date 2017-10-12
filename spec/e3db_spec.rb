@@ -8,9 +8,7 @@ describe E3DB do
   client1_public_key, client1_private_key = E3DB::Client.generate_keypair
   client2_public_key, client2_private_key = E3DB::Client.generate_keypair
 
-  client1_public_key = E3DB::PublicKey.new(:curve25519 => client1_public_key)
   client1_name = sprintf("test_client_%s", SecureRandom.hex)
-  client2_public_key = E3DB::PublicKey.new(:curve25519 => client2_public_key)
   client2_name = sprintf("share_client_%s", SecureRandom.hex)
 
   test_client1 = E3DB::Client.register(token, client1_name, client1_public_key, nil, false, api_url)
@@ -22,7 +20,7 @@ describe E3DB do
     :api_key_id   => test_client1.api_key_id,
     :api_secret   => test_client1.api_secret,
     :client_email => sprintf('eric+%s@tozny.com', test_client1.name),
-    :public_key   => test_client1.public_key.curve25519,
+    :public_key   => client1_public_key,
     :private_key  => client1_private_key,
     :api_url      => api_url,
     :logging      => false
@@ -36,7 +34,7 @@ describe E3DB do
       :api_key_id   => test_client2.api_key_id,
       :api_secret   => test_client2.api_secret,
       :client_email => sprintf('eric+%s@tozny.com', test_client2.name),
-      :public_key   => test_client2.public_key.curve25519,
+      :public_key   => client2_public_key,
       :private_key  => client2_private_key,
       :api_url      => api_url,
       :logging      => false
@@ -49,13 +47,12 @@ describe E3DB do
 
   it 'can register clients' do
     public_key, _ = E3DB::Client.generate_keypair
-    public_key = E3DB::PublicKey.new(:curve25519 => public_key)
     name = sprintf("client_%s", SecureRandom.hex)
 
     test_client = E3DB::Client.register(token, name, public_key, nil, false, api_url)
 
     expect(test_client.name).to eq(name)
-    expect(test_client.public_key.curve25519).to eq(public_key.curve25519)
+    expect(test_client.public_key.curve25519).to eq(public_key)
 
     expect(test_client.client_id).not_to be equal("")
     expect(test_client.api_key_id).not_to be equal("")
