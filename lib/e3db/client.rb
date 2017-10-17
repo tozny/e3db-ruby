@@ -276,7 +276,7 @@ module E3DB
 
     # Query the server for information about an E3DB client.
     #
-    # @param client_id [String] client ID or e-mail address to look up
+    # @param client_id [String] client ID to look up
     # @return [ClientInfo] information about this client
     def client_info(client_id)
       if client_id.include? "@"
@@ -525,7 +525,7 @@ module E3DB
     # Grant another E3DB client access to records of a particular type.
     #
     # @param type [String] type of records to share
-    # @param reader_id [String] client ID or e-mail address of reader to grant access to
+    # @param reader_id [String] client ID of reader to grant access to
     def share(type, reader_id)
       if reader_id == @config.client_id
         return
