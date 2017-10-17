@@ -280,9 +280,7 @@ module E3DB
     # @return [ClientInfo] information about this client
     def client_info(client_id)
       if client_id.include? "@"
-        base_url = get_url('v1', 'storage', 'clients', 'find')
-        url = base_url + sprintf('?email=%s', CGI.escape(client_id))
-        resp = @conn.post(url)
+        raise "Client discovery by email is not supported!"
       else
         resp = @conn.get(get_url('v1', 'storage', 'clients', client_id))
       end
