@@ -2,6 +2,10 @@ require 'spec_helper'
 require 'securerandom'
 
 describe E3DB do
+
+  raise "REGISTRATION_TOKEN environment variable must be defined." unless ENV["REGISTRATION_TOKEN"]
+  raise "API_URL environment variable must be defined." unless ENV["API_URL"]
+
   token = ENV["REGISTRATION_TOKEN"]
   api_url = ENV["API_URL"]
 
@@ -14,7 +18,7 @@ describe E3DB do
   test_client1 = E3DB::Client.register(token, client1_name, client1_public_key, nil, false, api_url)
   test_client2 = E3DB::Client.register(token, client2_name, client2_public_key, nil, false, api_url)
 
-  opts = E3DB::Config.new(
+  client1_opts = E3DB::Config.new(
     :version      => 1,
     :client_id    => test_client1.client_id,
     :api_key_id   => test_client1.api_key_id,
@@ -25,10 +29,10 @@ describe E3DB do
     :api_url      => api_url,
     :logging      => false
   )
-  client = E3DB::Client.new(opts)
+  client = E3DB::Client.new(client1_opts)
 
   # set up the shared client:
-  opts = E3DB::Config.new(
+  client2_opts = E3DB::Config.new(
       :version      => 1,
       :client_id    => test_client2.client_id,
       :api_key_id   => test_client2.api_key_id,
@@ -39,7 +43,7 @@ describe E3DB do
       :api_url      => api_url,
       :logging      => false
   )
-  client2 = E3DB::Client.new(opts)
+  client2 = E3DB::Client.new(client2_opts)
 
   # The sharing client data:
   test_email = client2.config.client_email
@@ -54,9 +58,9 @@ describe E3DB do
     expect(test_client.name).to eq(name)
     expect(test_client.public_key.curve25519).to eq(public_key)
 
-    expect(test_client.client_id).not_to be equal("")
-    expect(test_client.api_key_id).not_to be equal("")
-    expect(test_client.api_secret).not_to be equal("")
+    expect(test_client.client_id).not_to be eq("")
+    expect(test_client.api_key_id).not_to be eq("")
+    expect(test_client.api_secret).not_to be eq("")
   end
 
   it 'has a version number' do
@@ -69,7 +73,7 @@ describe E3DB do
   end
 
   # TODO: We should throw an E3DB-specific exception.
-  it 'throws an error when a client doesn''t exist' do
+  it "throws an error when a client doesn't exist" do
     expect { client.client_info('doesnt exist') }.to raise_error(Faraday::ResourceNotFound)
   end
 
@@ -250,5 +254,128 @@ describe E3DB do
   it 'can list incoming sharing' do
     isps = client.incoming_sharing
     expect(isps).to eq([])      # could do better with a 2nd test client
+  end
+
+  it 'can create & retrieve access keys' do
+    client1 = E3DB::Client.new(client1_opts)
+    type = sprintf('test-share-%s', SecureRandom.uuid)
+    rec = client1.write(type, {
+      :timestamp => DateTime.now.iso8601
+    })
+    eak = client.get_reader_key(client1_opts.client_id, client1_opts.client_id, type)
+    expect(eak).not_to be eq(nil)
+  end
+
+  it 'can encrypt and decrypt locally' do
+    client1 = E3DB::Client.new(client1_opts)
+    type = sprintf('test-share-%s', SecureRandom.uuid)
+    # Create AK & share before writing (simulating creating AK during registration)
+    client1_eak = client1.create_writer_key(type)
+    client1.share(type, client2_opts.client_id)
+
+    plain_rec = {
+      :timestamp => DateTime.now.iso8601.to_s
+    }
+
+    encrypted_rec = client1.encrypt_record(type, plain_rec, nil, client1_opts.client_id, client1_eak)
+    # Decrypt JSON
+    decrypted_rec = client1.decrypt_record(JSON.dump(encrypted_rec.to_hash), client1_eak)
+
+    expect(decrypted_rec.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
+
+    # Decrypt encrypred Record instance.
+    decrypted_rec2 = client1.decrypt_record(encrypted_rec, client1_eak)
+    expect(decrypted_rec2.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec2.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec2.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec2.data[:timestamp]).to eq(plain_rec[:timestamp])
+  end
+
+  it 'can encrypt locally and another client can decrypt locally' do
+    client1 = E3DB::Client.new(client1_opts)
+    type = sprintf('test-share-%s', SecureRandom.uuid)
+    # Create AK & share before writing (simulating creating AK during registration)
+    client1_eak = client1.create_writer_key(type)
+    client1.share(type, client2_opts.client_id)
+
+    plain_rec = {
+      :timestamp => DateTime.now.iso8601.to_s
+    }
+
+    # make sure client2 can still read encrypted recods
+    encrypted_rec = client1.encrypt_record(type, plain_rec, nil, client1_opts.client_id, client1_eak)
+
+    # make sure client2 can decrypt offline too
+    client2 = E3DB::Client.new(client2_opts)
+    client2_eak = client2.get_reader_key(client1_opts.client_id, client1_opts.client_id, type)
+    decrypted_rec = client2.decrypt_record(JSON.dump(encrypted_rec.to_hash), client2_eak)
+
+    expect(decrypted_rec.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
+  end
+
+  it 'can serialize & deserialize EAKs' do
+    client1 = E3DB::Client.new(client1_opts)
+    type = sprintf('test-share-%s', SecureRandom.uuid)
+    # Create AK & share before writing (simulating creating AK during registration)
+    client1_eak = JSON.dump(client1.create_writer_key(type).to_hash)
+
+    plain_rec = {
+      :timestamp => DateTime.now.iso8601.to_s
+    }
+
+    # make sure client2 can still read encrypted recods
+    encrypted_rec = client1.encrypt_record(
+      type, plain_rec, nil, client1_opts.client_id, E3DB::EAK.new(JSON.parse(client1_eak, symbolize_names: true))
+    )
+    decrypted_rec = client1.decrypt_record(
+      JSON.dump(encrypted_rec.to_hash), E3DB::EAK.new(JSON.parse(client1_eak, symbolize_names: true))
+    )
+
+    expect(decrypted_rec.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
+  end
+
+  it 'can round-trip encryption' do
+    client1 = E3DB::Client.new(client1_opts)
+    type = sprintf('test-share-%s', SecureRandom.uuid)
+    plain_rec = {
+      :timestamp => DateTime.now.iso8601.to_s
+    }
+    
+    record = client1.write(type, plain_rec)
+    client1_eak1 = JSON.dump(client1.create_writer_key(type).to_hash)
+    encrypted_rec = client1.encrypt_record(
+      type, plain_rec, nil, client1_opts.client_id, E3DB::EAK.new(JSON.parse(client1_eak1, symbolize_names: true))
+    )
+
+    client1.share(type, client2_opts.client_id)
+    client1_eak2 = JSON.dump(client1.create_writer_key(type).to_hash)
+
+    client1a = E3DB::Client.new(client1_opts)
+    decrypted_rec = client1a.decrypt_record(
+      JSON.dump(encrypted_rec.to_hash), E3DB::EAK.new(JSON.parse(client1_eak1, symbolize_names: true))
+    )
+    
+    expect(decrypted_rec.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
+
+    decrypted_rec = client1a.decrypt_record(
+      JSON.dump(encrypted_rec.to_hash), E3DB::EAK.new(JSON.parse(client1_eak2, symbolize_names: true))
+    )
+    
+    expect(decrypted_rec.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
   end
 end

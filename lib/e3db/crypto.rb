@@ -5,149 +5,65 @@
 # All Rights Reserved.
 #
 
-
 module E3DB
-  class Client
+  module Crypto
     private
-    def decrypt_record(record)
-      writer_id = record.meta.writer_id
-      user_id = record.meta.user_id
-      type = record.meta.type
-      ak = get_access_key(writer_id, user_id, @config.client_id, type)
-      decrypt_record_with_key(record, ak)
-    end
 
-    def decrypt_record_with_key(encrypted_record, ak)
-      record = Record.new(meta: encrypted_record.meta.clone, data: Hash.new)
-
-      encrypted_record.data.each do |k, v|
-        fields = v.split('.', 4)
-
-        edk =  Crypto.base64decode(fields[0])
-        edkN = Crypto.base64decode(fields[1])
-        ef =   Crypto.base64decode(fields[2])
-        efN =  Crypto.base64decode(fields[3])
-
-        dk = RbNaCl::SecretBox.new(ak).decrypt(edkN, edk)
-        pv = RbNaCl::SecretBox.new(dk).decrypt(efN, ef)
-
-        record.data[k] = pv
-      end
-
-      record
-    end
-
-    def encrypt_record(plaintext_record)
-      record = Record.new(meta: plaintext_record.meta.clone, data: Hash.new)
-
-      writer_id = record.meta.writer_id
-      user_id   = record.meta.user_id
-      type      = record.meta.type
-
-      begin
-        ak = get_access_key(writer_id, user_id, @config.client_id, type)
-      rescue Faraday::ResourceNotFound
-        ak = RbNaCl::Random.random_bytes(RbNaCl::SecretBox.key_bytes)
-        put_access_key(writer_id, user_id, @config.client_id, type, ak)
-      end
-
-      plaintext_record.data.each do |k, v|
-        dk =   Crypto.secret_box_random_key
-        efN =  Crypto.secret_box_random_nonce
-        ef =   RbNaCl::SecretBox.new(dk).encrypt(efN, v)
-        edkN = Crypto.secret_box_random_nonce
-        edk =  RbNaCl::SecretBox.new(ak).encrypt(edkN, dk)
-
-        record.data[k] = sprintf('%s.%s.%s.%s',
-                                 Crypto.base64encode(edk), Crypto.base64encode(edkN),
-                                 Crypto.base64encode(ef), Crypto.base64encode(efN))
-      end
-
-      record
-    end
-
-    def decrypt_eak(json)
-      k = json[:authorizer_public_key][:curve25519]
-      authorizer_pubkey = Crypto.decode_public_key(k)
-
-      fields     = json[:eak].split('.', 2)
-      ciphertext = Crypto.base64decode(fields[0])
-      nonce      = Crypto.base64decode(fields[1])
-      box        = RbNaCl::Box.new(authorizer_pubkey, @private_key)
-
-      box.decrypt(nonce, ciphertext)
-    end
-
-    def get_access_key(writer_id, user_id, reader_id, type)
-      ak_cache_key = [writer_id, user_id, type]
-      if @ak_cache.key? ak_cache_key
-        return @ak_cache[ak_cache_key]
-      end
-
-      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
-      resp = @conn.get(url)
-      json = JSON.parse(resp.body, symbolize_names: true)
-
-      ak = decrypt_eak(json)
-      @ak_cache[ak_cache_key] = ak
-      ak
-    end
-
-    def put_access_key(writer_id, user_id, reader_id, type, ak)
-      ak_cache_key = [writer_id, user_id, type]
-      @ak_cache[ak_cache_key] = ak
-
-      reader_key = client_key(reader_id)
-      nonce = RbNaCl::Random.random_bytes(RbNaCl::Box.nonce_bytes)
-      eak   = RbNaCl::Box.new(reader_key, @private_key).encrypt(nonce, ak)
-
-      encoded_eak = sprintf('%s.%s', Crypto.base64encode(eak), Crypto.base64encode(nonce))
-
-      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
-      @conn.put(url, { :eak => encoded_eak })
-    end
-
-    def delete_access_key(writer_id, user_id, reader_id, type)
-      url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, reader_id, type)
-      @conn.delete(url)
-
-      ak_cache_key = [writer_id, user_id, type]
-      @ak_cache.delete(ak_cache_key)
-    end
-
-  end
-
-  class Crypto
-    def self.decode_public_key(s)
-      RbNaCl::PublicKey.new(base64decode(s))
-    end
-
-    def self.encode_public_key(k)
-      base64encode(k.to_bytes)
-    end
-
-    def self.decode_private_key(s)
-      RbNaCl::PrivateKey.new(base64decode(s))
-    end
-
-    def self.encode_private_key(k)
-      base64encode(k.to_bytes)
-    end
-
-    def self.secret_box_random_key
+    # Create a new, random access key. Returns a
+    # string of bytes representing the key.
+    def new_access_key
       RbNaCl::Random.random_bytes(RbNaCl::SecretBox.key_bytes)
     end
 
-    def self.secret_box_random_nonce
+    alias :new_data_key :new_access_key
+
+    def decode_public_key(s)
+      RbNaCl::PublicKey.new(base64decode(s))
+    end
+
+    def encode_public_key(k)
+      base64encode(k.to_bytes)
+    end
+
+    def decode_private_key(s)
+      RbNaCl::PrivateKey.new(base64decode(s))
+    end
+
+    def encode_private_key(k)
+      base64encode(k.to_bytes)
+    end
+
+    def box_random_nonce
+      RbNaCl::Random.random_bytes(RbNaCl::Box.nonce_bytes)
+    end
+
+    def secret_box_random_nonce
       RbNaCl::Random.random_bytes(RbNaCl::SecretBox.nonce_bytes)
     end
 
-    def self.base64encode(x)
+    def base64encode(x)
       Base64.urlsafe_encode64(x, padding: false)
     end
 
-    def self.base64decode(x)
+    def base64decode(x)
       Base64.urlsafe_decode64(x)
+    end
+
+    def decrypt_box(encrypted, pub, priv)
+      pub = decode_public_key(pub) unless pub.is_a? RbNaCl::PublicKey
+      priv = decode_private_key(priv) unless priv.is_a? RbNaCl::PrivateKey
+
+      ciphertext, nonce = encrypted.split('.', 2).map { |f| base64decode(f) }
+      RbNaCl::Box.new(pub, priv).decrypt(nonce, ciphertext)
+    end
+
+    def encrypt_box(plain, pub, priv)
+      pub = decode_public_key(pub) unless pub.is_a? RbNaCl::PublicKey
+      priv = decode_private_key(priv) unless priv.is_a? RbNaCl::PrivateKey
+
+      nonce = box_random_nonce
+      encrypted = RbNaCl::Box.new(pub, priv).encrypt(nonce, plain)
+      [encrypted, nonce].map { |f| base64encode(f) }.join(".")
     end
   end
 
