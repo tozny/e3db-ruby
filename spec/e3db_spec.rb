@@ -121,6 +121,20 @@ describe E3DB do
     }.to raise_error(E3DB::ConflictError)
   end
 
+  it 'can raise an exception on conflicting delete' do
+    rec = client.write('test_result', {
+      :counter => '0'
+    })
+
+    recA = E3DB::Record.new(rec.to_hash)
+    inc_field(recA, :counter)
+    client.update(recA)
+
+    expect {
+      client.delete(rec.meta.record_id, rec.meta.version)
+    }.to raise_error(E3DB::ConflictError)
+  end
+
   it 'can query records by type' do
     type = sprintf('test-type-%s', SecureRandom.uuid)
     rec1 = client.write(type, {

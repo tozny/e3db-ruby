@@ -40,7 +40,12 @@ module E3DB
   # the affected record and retry the update operation.
   class ConflictError < StandardError
     def initialize(record)
-      super('Conflict updating record: ' + record.meta.record_id)
+      if record.is_a? E3DB::Record
+        super('Conflict updating record: ' + record.meta.record_id)
+      else
+        super('Conflict updating record: ' + record)
+      end
+
       @record = record
     end
 
@@ -332,17 +337,6 @@ module E3DB
       end
     end
 
-    # Read a single record by ID from E3DB and return it without
-    # decrypting the data fields.
-    #
-    # @param record_id [String] record ID to look up
-    # @return [Record] encrypted record object
-    def read_raw(record_id)
-      resp = @conn.get(get_url('v1', 'storage', 'records', record_id))
-      json = JSON.parse(resp.body, symbolize_names: true)
-      Record.new(json)
-    end
-
     # Read a single record by ID from E3DB and return it.
     #
     # @param record_id [String] record ID to look up
@@ -412,12 +406,30 @@ module E3DB
      end
     end
 
-    # Delete a record from the E3DB storage service.
+    # Delete a record from the E3DB storage service. If a version
+    # is provided and does not match, an E3DB::ConflicError exception
+    # will be raised.
+    #
+    # Always returns +nil+.
     #
     # @param record_id [String] unique ID of record to delete
+    # @param version [String] version ID that must match before deleting the record.
     # @return [Nil] Always returns nil.
-    def delete(record_id)
-      @conn.delete(get_url('v1', 'storage', 'records', record_id))
+    def delete(record_id, version=nil)
+      if version.nil?
+        resp = @conn.delete(get_url('v1', 'storage', 'records', record_id))
+      else
+        begin
+          resp = @conn.delete(get_url('v1', 'storage', 'records', 'safe', record_id, version))
+        rescue Faraday::ClientError => e
+          if e.response[:status] == 409
+            raise E3DB::ConflictError, record_id
+          else
+            raise e   # re-raise on other failures
+          end
+        end
+      end
+      
       nil
     end
 
@@ -486,10 +498,9 @@ module E3DB
       include Enumerable
       include Crypto
 
-      def initialize(client, query, raw)
+      def initialize(client, query)
         @client = client
         @query = query
-        @raw = raw
       end
 
       # Invoke a block for each record matching a query.
@@ -504,11 +515,7 @@ module E3DB
           results = json[:results]
           results.each do |r|
             if q.include_data
-              if !@raw
-                record = @client.decrypt_record(Record.new({ :meta => r[:meta], :data => r[:record_data] }), EAK.new(r[:access_key]))
-              else
-                record = Record.new(data: r[:record_data], meta: Meta.new(r[:meta]))
-              end
+              record = @client.decrypt_record(Record.new({ :meta => r[:meta], :data => r[:record_data] }), EAK.new(r[:access_key]))
             else
               record = Record.new(data: Hash.new, meta: Meta.new(r[:meta]))
             end
@@ -552,10 +559,9 @@ module E3DB
     # @param type [String,Array<string>] select records with these types
     # @param plain [Hash] plaintext query expression to select
     # @param data [Boolean] include data in records
-    # @param raw [Boolean] when true don't decrypt record data
     # @param page_size [Integer] number of records to fetch per request
     # @return [Result] a result set object enumerating matched records
-    def query(data: true, raw: false, writer: nil, record: nil, type: nil, plain: nil, page_size: DEFAULT_QUERY_COUNT)
+    def query(data: true, writer: nil, record: nil, type: nil, plain: nil, page_size: DEFAULT_QUERY_COUNT)
       all_writers = false
       if writer == :all
         all_writers = true
@@ -566,7 +572,7 @@ module E3DB
                     record_ids: record, content_types: type, plain: plain,
                     user_ids: nil, count: page_size,
                     include_all_writers: all_writers)
-      result = Result.new(self, q, raw)
+      result = Result.new(self, q)
       if block_given?
         result.each do |rec|
           yield rec

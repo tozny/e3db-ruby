@@ -110,25 +110,6 @@ isaac_pub_key = client.client_key(isaac_client_id)
 puts isaac_pub_key.inspect
 
 # ---------------------------------------------------------
-# More reading and inspection of records
-# ---------------------------------------------------------
-
-# read_raw gets a record without decrypting its data
-rawRecord = client.read_raw(record_id)
-newRecord = client.read(record_id)
-
-# So let's compare them:
-
-puts (rawRecord.meta == newRecord.meta).to_s # true
-puts (rawRecord.data == newRecord.data).to_s # false
-
-puts newRecord.data[:name] + ' encrypts to ' + rawRecord.data[:name]
-
-# Records contain a few other fields that are fun to look at, and this gives
-# you a good sense for what's encrypted and what's not:
-puts rawRecord.inspect
-
-# ---------------------------------------------------------
 # Clean up - Comment these out if you want to experiment
 # ---------------------------------------------------------
 
