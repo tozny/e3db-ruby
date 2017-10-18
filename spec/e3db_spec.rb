@@ -72,11 +72,6 @@ describe E3DB do
     expect(info.client_id).to eq(client.config.client_id)
   end
 
-  # Ignoring test for now until dynamic clients can be referenced by email address
-  pending 'can look up a client by e-mail address' do
-    info = client.client_info(test_email)
-  end
-
   # TODO: We should throw an E3DB-specific exception.
   it "throws an error when a client doesn't exist" do
     expect { client.client_info('doesnt exist') }.to raise_error(Faraday::ResourceNotFound)
@@ -237,15 +232,6 @@ describe E3DB do
 
     rec2 = client2.read(rec.meta.record_id)
     expect(rec.data).to eq(rec2.data)
-  end
-
-  # Ignoring test for now until dynamic clients can be referenced by email address
-  pending 'can share by e-mail address' do
-    type = sprintf('test-share-%s', SecureRandom.uuid)
-    rec = client.write(type, {
-      :timestamp => DateTime.now.iso8601
-    })
-    client.share(type, test_email)
   end
 
   it 'can list outgoing sharing' do
