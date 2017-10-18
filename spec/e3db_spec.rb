@@ -356,4 +356,40 @@ describe E3DB do
     expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
     expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
   end
+
+  it 'can round-trip encryption' do
+    client1 = E3DB::Client.new(client1_opts)
+    type = sprintf('test-share-%s', SecureRandom.uuid)
+    plain_rec = {
+      :timestamp => DateTime.now.iso8601.to_s
+    }
+    
+    record = client1.write(type, plain_rec)
+    client1_eak1 = JSON.dump(client1.create_writer_key(type).to_hash)
+    encrypted_rec = client1.encrypt_new_record(
+      type, plain_rec, nil, client1_opts.client_id, E3DB::EAK.new(JSON.parse(client1_eak1, symbolize_names: true))
+    )
+
+    client1.share(type, client2_opts.client_id)
+    client1_eak2 = JSON.dump(client1.create_writer_key(type).to_hash)
+
+    client1a = E3DB::Client.new(client1_opts)
+    decrypted_rec = client1a.decrypt_record(
+      JSON.dump(encrypted_rec.to_hash), E3DB::EAK.new(JSON.parse(client1_eak1, symbolize_names: true))
+    )
+    
+    expect(decrypted_rec.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
+
+    decrypted_rec = client1a.decrypt_record(
+      JSON.dump(encrypted_rec.to_hash), E3DB::EAK.new(JSON.parse(client1_eak2, symbolize_names: true))
+    )
+    
+    expect(decrypted_rec.meta.user_id).to eq(encrypted_rec.meta.user_id)
+    expect(decrypted_rec.meta.type).to eq(encrypted_rec.meta.type)
+    expect(decrypted_rec.meta.plain).to eq(encrypted_rec.meta.plain)
+    expect(decrypted_rec.data[:timestamp]).to eq(plain_rec[:timestamp])
+  end
 end

@@ -656,8 +656,8 @@ module E3DB
       begin
         put_access_key(id, id, id, type, new_access_key)
       rescue Faraday::ClientError => e
-        # Ignore 403, as it means a key already exists. Otherwise, raise.
-        if e.response[:status] != 403
+        # Ignore 409, as it means a key already exists. Otherwise, raise.
+        if e.response[:status] != 409
           raise e
         end
       end
