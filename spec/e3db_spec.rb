@@ -87,6 +87,21 @@ describe E3DB do
     expect(rec1.data).not_to be equal(rec2.data)
   end
 
+  it 'can filter fields when reading single records' do
+    record = client.write('field_test', {
+        :visible => 'This is visible',
+        :alsovisible => 'So is this',
+        :hidden => 'This will be filtered out'
+    })
+
+    retrieved = client.read(record.meta.record_id, ['visible', 'alsovisible'])
+
+    expect(retrieved.meta.record_id).to eq(record.meta.record_id)
+    expect(retrieved.data).to have_key(:visible)
+    expect(retrieved.data).to have_key(:alsovisible)
+    expect(retrieved.data).not_to have_key(:hidden)
+  end
+
   def inc_field(rec, field)
     rec.data[field] = (rec.data[field].to_i + 1).to_s
   end
