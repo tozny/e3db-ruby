@@ -291,7 +291,7 @@ describe E3DB do
       :timestamp => DateTime.now.iso8601.to_s
     }
 
-    encrypted_rec = client1.encrypt_new_record(type, plain_rec, nil, client1_opts.client_id, client1_eak)
+    encrypted_rec = client1.encrypt_record(type, plain_rec, nil, client1_opts.client_id, client1_eak)
     # Decrypt JSON
     decrypted_rec = client1.decrypt_record(JSON.dump(encrypted_rec.to_hash), client1_eak)
 
@@ -320,7 +320,7 @@ describe E3DB do
     }
 
     # make sure client2 can still read encrypted recods
-    encrypted_rec = client1.encrypt_new_record(type, plain_rec, nil, client1_opts.client_id, client1_eak)
+    encrypted_rec = client1.encrypt_record(type, plain_rec, nil, client1_opts.client_id, client1_eak)
 
     # make sure client2 can decrypt offline too
     client2 = E3DB::Client.new(client2_opts)
@@ -344,7 +344,7 @@ describe E3DB do
     }
 
     # make sure client2 can still read encrypted recods
-    encrypted_rec = client1.encrypt_new_record(
+    encrypted_rec = client1.encrypt_record(
       type, plain_rec, nil, client1_opts.client_id, E3DB::EAK.new(JSON.parse(client1_eak, symbolize_names: true))
     )
     decrypted_rec = client1.decrypt_record(
@@ -366,7 +366,7 @@ describe E3DB do
     
     record = client1.write(type, plain_rec)
     client1_eak1 = JSON.dump(client1.create_writer_key(type).to_hash)
-    encrypted_rec = client1.encrypt_new_record(
+    encrypted_rec = client1.encrypt_record(
       type, plain_rec, nil, client1_opts.client_id, E3DB::EAK.new(JSON.parse(client1_eak1, symbolize_names: true))
     )
 

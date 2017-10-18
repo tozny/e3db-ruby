@@ -188,11 +188,14 @@ module E3DB
     attribute :record_type, Types::Strict::String
   end
 
-  # Represents an encrypted secret key that can
-  # be used to encrypt and decrypt records.
+  # Represents an "encrypted access key" that can be used to encrypt
+  # and decrypt records.
   #
-  # Should only be obtained by calling {Client#create_writer_key}
-  # or {Client#get_reader_key}.
+  # Should only be obtained by calling {Client#create_writer_key} or
+  # {Client#get_reader_key}.
+  #
+  # To serialize to JSON (for storage), use `JSON.dump(eak.to_hash)`. 
+  # To load from JSON, use `E3DB::EAK.new(JSON.parse(eak, symbolize_names: true))`.
   class EAK < Dry::Struct
     attribute :eak, Types::Strict::String
     attribute :authorizer_public_key, PublicKey
@@ -375,7 +378,7 @@ module E3DB
         end
       end
 
-      resp = @conn.post(url, encrypt_new_record(type, data, plain, id, eak).to_hash)
+      resp = @conn.post(url, encrypt_record(type, data, plain, id, eak).to_hash)
       decrypt_record(resp.body, eak)
     end
 
@@ -397,7 +400,7 @@ module E3DB
 
       begin
         type = record.meta.type
-        encrypted_record = encrypt_record(record, get_eak(@config.client_id, @config.client_id, record.meta.type))
+        encrypted_record = encrypt_existing(record, get_eak(@config.client_id, @config.client_id, record.meta.type))
         resp = @conn.put(url, encrypted_record.to_hash)
         json = JSON.parse(resp.body, symbolize_names: true)
         record.meta = Meta.new(json[:meta])
@@ -646,9 +649,12 @@ module E3DB
       return json.map {|x| IncomingSharingPolicy.new(x)}
     end
 
-    # Create and return an (encrypted) secret key for encrypting the
-    # given record type. Can be saved for use with {#encrypt_record},
-    # {#encrypt_new_record} and {#decrypt_record} later.
+    # Create and return a key for encrypting the given record type.
+    # The value returned is encrypted such that it can only be used by this
+    # client.
+    #
+    # Can be saved for use with {#encrypt_existing}, {#encrypt_record}
+    # and {#decrypt_record} later.
     #
     # @return [EAK]
     def create_writer_key(type)
@@ -665,22 +671,27 @@ module E3DB
       get_eak(id, id, type)
     end
 
-    # Retrieve an (encrypted) key for reading records written by the
-    # given writer for the given user with the given type (assuming
-    # the writer previously established sharing with this client).
+    # Retrieve a key for reading records shared with this client. 
+    #
+    # +writer_id+ is the ID of the client who wrote the shared records. +user_id+
+    # is the ID of the user that the record pertains to. +type+ is the type of
+    # the shared record.
+    #
+    # The value returned is encrypted such that it can only be used by
+    # this client.
     #
     # @return [EAK]
     def get_reader_key(writer_id, user_id, type)
       get_eak(writer_id, user_id, type)
     end
 
-    # Encrypts a record, using the encrypted key provided.
+    # Encrypts an existing record. The record must contain plaintext values.
     #
-    # +plain_record+ should be a Record instance to encrypt. +eak+ should
-    # be an encrypted secret key, obtained via {#create_writer_key}.
+    # +plain_record+ should be a {Record} instance to encrypt. 
+    # +eak+ should be an {EAK} instance.
     #
-    # @return [Record] An instace containg the encrypted data.
-    def encrypt_record(plain_record, eak)
+    # @return [Record] An instance containg the encrypted data.
+    def encrypt_existing(plain_record, eak)
       cache_key = [plain_record.meta.writer_id, plain_record.meta.user_id, plain_record.meta.type]
       if ! @ak_cache.has_key? cache_key
         @ak_cache[cache_key] = { :eak => eak, :ak => decrypt_box(eak.eak, eak.authorizer_public_key.curve25519, @private_key) }
@@ -707,23 +718,21 @@ module E3DB
     # +type+ is a string giving the record type. +data+ should be a
     # dictionary of string values. +plain+ should be a dictionary of
     # string values. +id+ should be the ID of the client creating the
-    # record. +eak+ should be an encrypted secret key, obtained via
-    # {#create_writer_key}.
+    # record. +eak+ should be an {EAK} instance.
     #
     # @return [Record] An instance containing the encrypted data.
-    def encrypt_new_record(type, data, plain, id, eak)
+    def encrypt_record(type, data, plain, id, eak)
       meta = Meta.new(record_id: nil, writer_id: id, user_id: id,
                       type: type, plain: plain, created: nil,
                       last_modified: nil, version: nil)
 
-      encrypt_record(Record.new(:meta => meta, :data => data), eak)
+      encrypt_existing(Record.new(:meta => meta, :data => data), eak)
     end
 
     # Decrypts a record using the given secret key.
     #
     # The record should be either a JSON document (as a string) or a
-    # Record instance. +eak+ should be an encrypted secret key,
-    # obtained via {#get_reader_key}.
+    # {Record} instance. +eak+ should be an {EAK} instance.
     #
     # @return [Record] An instance containing the decrypted data.
     def decrypt_record(encrypted_record, eak)
@@ -827,7 +836,7 @@ module E3DB
       nil
     end
 
-    # Delete the access key for the given combinatino of writer, user,
+    # Delete the access key for the given combination of writer, user,
     # reader and type.
     #
     # Returns nil in all cases.
