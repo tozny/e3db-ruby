@@ -340,9 +340,20 @@ module E3DB
     # Read a single record by ID from E3DB and return it.
     #
     # @param record_id [String] record ID to look up
+    # @param fields    [Array]  Optional array of fields to filter
     # @return [Record] decrypted record object
-    def read(record_id)
-      resp = @conn.get(get_url('v1', 'storage', 'records', record_id))
+    def read(record_id, fields = nil)
+      path = get_url('v1', 'storage', 'records', record_id)
+
+      unless fields.nil?
+        resp = @conn.get(path) do |req|
+          req.options.params_encoder = Faraday::FlatParamsEncoder
+          req.params['field'] = fields
+        end
+      else
+        resp = @conn.get(path)
+      end
+
       record = Record.new(JSON.parse(resp.body, symbolize_names: true))
       writer_id = record.meta.writer_id
       user_id = record.meta.user_id
