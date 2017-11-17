@@ -28,6 +28,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'lru_redux', '~> 1.1'
   spec.add_dependency 'rbnacl', '~> 4.0', '>= 4.0.2'
   spec.add_dependency 'net-http-persistent', '~> 2.9.4'
-  spec.add_dependency 'faraday_middleware', '~> 0.11.0.1'
-  spec.add_dependency 'oauth2', '~> 1.3', '>= 1.3.1'
+  spec.add_dependency 'faraday_middleware', '~> 0.11.0'
+  spec.add_dependency 'faraday', '~> 0.11.0'
+  spec.add_dependency 'oauth2', '~> 1.3.1', '>= 1.3.1'
 end

@@ -42,11 +42,18 @@ module E3DB
     end
 
     def base64encode(x)
-      Base64.urlsafe_encode64(x, padding: false)
+      result = Base64.urlsafe_encode64(x)
+      result.delete("=")
     end
 
     def base64decode(x)
-      Base64.urlsafe_decode64(x)
+      rem = x.length % 4
+      # Add any missing padding
+      if rem == 0
+        Base64.urlsafe_decode64(x)
+      else
+        Base64.urlsafe_decode64(x + ("=" * (4 - rem)))
+      end
     end
 
     def decrypt_box(encrypted, pub, priv)
