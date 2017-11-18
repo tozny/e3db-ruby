@@ -41,10 +41,14 @@ def usage(err)
   puts <<-USAGE
 integration.rb <command>
 
+  Read, write and delete integration test records. This script uses
+  the default credentials found at ~/.tozny/e3db.json.
+
 where <command> is one of:
 
-  read [type] [type]
-    Read records of the given type(s). An error will be raised if no
+  read [type[, type, ...]]
+    Read records of the given type(s). Multiple types should be
+    provided in a comma separated list. An error will be raised if no
     record exists for a given type.
 
   write  
