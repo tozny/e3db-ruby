@@ -12,6 +12,7 @@ end
 
 def read(*types)
   did_read = {}
+  types = types[0].split(",")
   @client.query(type: types).each do |record|
     puts "Confirming #{record.meta.record_id} (#{record.meta.type})"
     raise "(actual) #{record.data[:test]}, (expected) #{@record['test']}; (#{record.meta.type})" if @record['test'] != record.data[:test]
@@ -51,7 +52,7 @@ where <command> is one of:
     provided in a comma separated list. An error will be raised if no
     record exists for a given type.
 
-  write  
+  write
     Write a test record with the type 'ruby'.
 
   delete
