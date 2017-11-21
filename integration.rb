@@ -26,13 +26,6 @@ def read(*types)
   end
 end
 
-def delete(type)
-  @client.query(type: type).each do |record|
-    puts "Deleting #{record.meta.record_id}/#{record.meta.version} (#{record.meta.type})"
-    @client.delete(record.meta.record_id, record.meta.version)
-  end
-end
-
 def usage(err)
   if err
     puts err
@@ -55,9 +48,6 @@ where <command> is one of:
   write
     Write a test record with the type 'ruby'.
 
-  delete
-    Delete all records of type 'ruby'.
-
 USAGE
 
   exit(1)
@@ -71,8 +61,6 @@ if $0 == __FILE__
     read(*ARGV.drop(1))
   when "write"
     write("ruby")
-  when "delete"
-    delete("ruby")
   else
     usage("Unrecognized command: #{ARGV[0]}")
   end
