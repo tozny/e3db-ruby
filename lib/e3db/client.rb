@@ -779,9 +779,11 @@ module E3DB
     # given writer/user/type combination. Throws
     # Faraday::ResourceNotFound if the key does not exist.
     #
-    # Returns an instance of E3DB::EAK.
+    # Returns an instance of E3DB::EAK. Can be nil if the given 
+    # key does not exist.
     def get_eak(writer_id, user_id, type)
-      get_cached_key(writer_id, user_id, type)[:eak]
+      entry = get_cached_key(writer_id, user_id, type)
+      entry[:eak] unless entry.nil?
     end
 
     # Retrieve the access key for the given combination of writer,
@@ -806,6 +808,7 @@ module E3DB
         @ak_cache[cache_key]
       else
         url = get_url('v1', 'storage', 'access_keys', writer_id, user_id, @config.client_id, type)
+        # TODO: what happens when this call fails?
         json = JSON.parse(@conn.get(url).body, symbolize_names: true)
         @ak_cache[cache_key] = {
           :eak => EAK.new(json),

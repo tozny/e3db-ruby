@@ -298,9 +298,7 @@ describe E3DB do
   it 'can encrypt and decrypt locally' do
     client1 = E3DB::Client.new(client1_opts)
     type = sprintf('test-share-%s', SecureRandom.uuid)
-    # Create AK & share before writing (simulating creating AK during registration)
     client1_eak = client1.create_writer_key(type)
-    client1.share(type, client2_opts.client_id)
 
     plain_rec = {
       :timestamp => DateTime.now.iso8601.to_s
